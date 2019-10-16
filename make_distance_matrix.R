@@ -2,11 +2,14 @@ library(sf)
 library(raster)
 library(fasterize)
 library(gdistance)
-library(rnaturalearth)
 library(data.table)
 library(tidyverse)
 
+print("Warning: Initial installation will take multiple hours!")
+
 #### global variables ####
+
+print("Loading data")
 gdbpath <- "//dcnsbiona01b/edc_v1_shr6/HMD/HF&LD/GIS_FPP/InteractiveMaps/Working/PMF_Working.gdb"
 proj <- "+proj=longlat +datum=WGS84"
 
@@ -72,12 +75,18 @@ saveRDS(tunicates_sites,"tunicates_sites.rds")
 saveRDS(tunicates,"tunicates.rds")
 
 
-CAN <- ne_states(country=c("Canada"),returnclass = "sf")
-USA <- ne_states(country=c("United States of America"),returnclass = "sf")
-
 bbox <- st_bbox(st_buffer(rbind(tunicates_sites,greencrab_sites),2))
+
+if(!file.exists("gshhg-shp-2.3.7")){
+  print("Downloading Coastline")
+  curl::curl_download(url="http://www.soest.hawaii.edu/pwessel/gshhg/gshhg-shp-2.3.7.zip",
+                      destfile = "gshhg-shp-2.3.7.zip")
+  utils::unzip("gshhg-shp-2.3.7.zip")
+}
+
+
 # GSHHS is from http://www.soest.hawaii.edu/pwessel/gshhs/index.html
-maritimes <- st_read("../GSHHS_shp/f/GSHHS_f_L1.shp")%>%
+maritimes <- st_read("GSHHS_shp/f/GSHHS_f_L1.shp")%>%
   st_crop(bbox)%>% 
   st_union() %>% 
   st_cast('POLYGON') %>% 
@@ -86,6 +95,8 @@ maritimes <- st_read("../GSHHS_shp/f/GSHHS_f_L1.shp")%>%
 source("functions.R")
 
 #### set up transition matrix ####
+
+print("Setting up transition matrix")
 r <- raster(maritimes,
             ext=extent(c(-68.5,-59,43,47.5)),
             # ext=extent(c(-61.3,-60.7,45.5,45.7)),
@@ -100,6 +111,7 @@ saveRDS(tr,"transition.rds")
 
 #### NS vs green crabs and tunicates ####
 
+print("Calculating in water distances")
 nsgcdist <- do.call(rbind,(lapply(NS$Shape, function(x) inwaterdistance(greencrab_sites,x,tr))))
 row.names(nsgcdist) <- NS$Lease_Identifier
 colnames(nsgcdist) <- greencrab_sites$StnLocation

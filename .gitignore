@@ -37,3 +37,12 @@ vignettes/*.pdf
 
 # Sensitive data files
 *.rds
+
+# Contents of GSHHS zip file
+GSHHS_shp/*
+README.TXT
+SHAPEFILES.TXT
+LICENSE.TXT
+WDBII_shp/*
+COPYING.LESSERv3
+gshhg-shp-2.3.7.zip

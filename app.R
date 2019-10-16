@@ -21,6 +21,10 @@ mitigations <- read.csv("mitigation.csv",stringsAsFactors = FALSE)%>%
   complete(Scientific_Name,Product_treated) %>% 
   left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "Scientific_Name")
 
+if(!file.exists("greencrab_sites.rds")){
+  source("make_distance_matrix.R")
+}
+
 greencrab_sites <- readRDS("greencrab_sites.rds")
 greencrab <- readRDS("greencrab.rds")
 tunicates_sites <- readRDS("tunicates_sites.rds")
