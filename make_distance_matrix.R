@@ -1,9 +1,9 @@
-library(sf)
-library(raster)
-library(fasterize)
-library(gdistance)
-library(data.table)
-library(tidyverse)
+if(!require("sf")) install.packages("sf")
+if(!require("raster")) install.packages("raster")
+if(!require("fasterize")) install.packages("fasterize")
+if(!require("gdistance")) install.packages("gdistance")
+if(!require("data.table")) install.packages("data.table")
+if(!require("tidyverse")) install.packages("tidyverse")
 
 print("Warning: Initial installation will take multiple hours!")
 

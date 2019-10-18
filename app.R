@@ -1,9 +1,9 @@
-library(shiny)
-library(sf)
-library(leaflet)
-library(leaflet.minicharts)
-library(data.table)
-library(tidyverse)
+if(!require("shiny")) install.packages("shiny")
+if(!require("sf")) install.packages("sf")
+if(!require("leaflet")) install.packages("leaflet")
+if(!require("leaflet.minicharts")) install.packages("leaflet.minicharts")
+if(!require("data.table")) install.packages("data.table")
+if(!require("tidyverse")) install.packages("tidyverse")
 
 #### global variables ####
 gdbpath <- "//dcnsbiona01b/edc_v1_shr6/HMD/HF&LD/GIS_FPP/InteractiveMaps/Working/PMF_Working.gdb"
