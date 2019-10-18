@@ -2,7 +2,7 @@
 
 This tool is designed to facilitate the process of reviewing applications for introductions and transfers of aquaculture stock. 
 
-Currently, the app is only operational for native shellfish transfers in the Maritimes region. Users must have access to DFO Maitimes shared `W` drive
+Currently, the app is only operational for native shellfish transfers in the Maritimes region. Users must have access to DFO Maritimes shared `W` drive for access to the monitoring date.
 
 # Installation
 
