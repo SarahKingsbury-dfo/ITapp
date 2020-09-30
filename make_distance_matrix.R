@@ -10,7 +10,8 @@ print("Warning: Initial installation will take multiple hours!")
 #### global variables ####
 
 print("Loading data")
-gdbpath <- "//dcnsbiona01b/edc_v1_shr6/HMD/HF&LD/GIS_FPP/InteractiveMaps/Working/PMF_Working.gdb"
+gdbpath <- "//ent.dfo-mpo.ca/ATLShares/Shared/ButlerS/Interactive Map Tool/ArcGIS/PMF_Working.gdb"
+# gdbpath <- "~/../Desktop/Interactive Map Tool/AIS/Working/PMF_Working.gdb/"
 proj <- "+proj=longlat +datum=WGS84"
 
 NS <- read_sf(gdbpath, layer="NS_Aquaculture_Leases_2018") %>% st_transform(crs=proj)
