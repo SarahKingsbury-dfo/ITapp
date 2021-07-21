@@ -35,8 +35,6 @@ vignettes/*.pdf
 *.utf8.md
 *.knit.md
 
-# Sensitive data files
-*.rds
 
 # Contents of GSHHS zip file
 GSHHS_shp/*
