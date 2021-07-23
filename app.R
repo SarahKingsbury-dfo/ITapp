@@ -1,3 +1,5 @@
+if(!require("devtools")) install.packages("devtools")
+if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
 if(!require("shiny")) install.packages("shiny")
 if(!require("sf")) install.packages("sf")
 if(!require("leaflet")) install.packages("leaflet")
@@ -6,32 +8,76 @@ if(!require("data.table")) install.packages("data.table")
 if(!require("tidyverse")) install.packages("tidyverse")
 
 #### global variables ####
-gdbpath <- "//ent.dfo-mpo.ca/ATLShares/Shared/ButlerS/Interactive Map Tool/ArcGIS/PMF_Working.gdb"
+# gdbpath <- "//ent.dfo-mpo.ca/ATLShares/Shared/ButlerS/Interactive Map Tool/ArcGIS/PMF_Working.gdb"
 # gdbpath <- "~/../Desktop/Interactive Map Tool/AIS/Working/PMF_Working.gdb/"
 proj <- "+proj=longlat +datum=WGS84"
 
-NS <- read_sf(gdbpath, layer="NS_Aquaculture_Leases_2018") %>% st_transform(crs=proj)
+# NS <- read_sf(gdbpath, layer="NS_Aquaculture_Leases_2018") %>% st_transform(crs=proj)
 # PEI <- read_sf(gdbpath, layer="PEI_Aquaculture_Leases_2019") %>% st_transform(crs=proj)
 # NB <- read_sf(gdbpath, layer="NB_Aquaculture_Leases_2019") %>% st_transform(crs=proj)
 
-tunicatesp <- c("Ciona_intestinalis","Botryllus_schlosseri","Botrylloides_violaceus","Styela_clava",
-                "Diplosoma_listerianum","Ascidiella_aspersa","Membranipora_membranacea","Caprella_mutica",
-                "Didemnum_vexillum")
+
+### download provincial lease data or just open the saved version
+if(!file.exists("spatialdata/NS.rds")){
+  NS <- esri2sf::esri2sf('https://services.arcgis.com/nQHSMRVltyfsxeFe/ArcGIS/rest/services/Marine_Lease_Boundary_Database_Shellfish_View/FeatureServer/0') %>% 
+    filter(SiteStatus=="Issued") %>% 
+    mutate(Lease_Identifier=License_Lease_Num) %>% 
+    st_transform(proj)
+  NB <- esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/0') %>% 
+    mutate(Lease_Identifier=MSNO) %>% 
+    st_transform(proj)
+  # PEI <- esri2sf::esri2sf('https://www.arcgis.com/sharing/rest/content/items/16aa8830c7084a8a92ce066b525978b4')
+  
+  raw <- jsonlite::read_json(
+    "https://www.arcgis.com/sharing/rest/content/items/16aa8830c7084a8a92ce066b525978b4/data",
+    simplifyVector = FALSE
+  )
+  
+  features <- c(raw$operationalLayers[[1]]$featureCollection$layers[[1]]$featureSet$features,
+                raw$operationalLayers[[2]]$featureCollection$layers[[1]]$featureSet$features,
+                raw$operationalLayers[[3]]$featureCollection$layers[[1]]$featureSet$features)
+  
+  PEI <- lapply(features, "[[", "attributes") %>% 
+    lapply(as_tibble) %>% 
+    bind_rows() %>% 
+    mutate(geometry = esri2sf:::esri2sfPolygon(features)) %>% 
+    st_as_sf() %>% 
+    st_set_crs(features[[1]]$geometry$spatialReference$latestWkid)%>% 
+    mutate(Lease_Identifier=Lease) %>% 
+    st_transform(proj)
+  
+  saveRDS(NS,"spatialdata/NS.rds")
+  saveRDS(NB,"spatialdata/NB.rds")
+  saveRDS(PEI,"spatialdata/PEI.rds")
+  
+  
+}
+NS <- readRDS("spatialdata/NS.rds")
+NB <- readRDS("spatialdata/NB.rds")
+PEI <- readRDS("spatialdata/PEI.rds")
+
+
+AIS <- read.csv("commonnames.csv")
 
 mitigations <- read.csv("mitigation.csv",stringsAsFactors = FALSE)%>% 
   complete(Scientific_Name,Product_treated) %>% 
   left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "Scientific_Name")
 
-if(!file.exists("greencrab_sites.rds")){
+if(!file.exists("outputdata/pei_monitoring_dist.rds")){
   source("make_distance_matrix.R")
 }
 
-greencrab_sites <- readRDS("greencrab_sites.rds")
-greencrab <- readRDS("greencrab.rds")
-tunicates_sites <- readRDS("tunicates_sites.rds")
-tunicates <- readRDS("tunicates.rds")
-nsgcdist <- readRDS("nsgcdist.rds")
-nstudist <- readRDS("nstudist.rds")
+incidental_sites <- readRDS("outputdata/incidental_sites.rds")
+incidental <- readRDS("outputdata/incidental.rds")
+monitoring_sites <- readRDS("outputdata/monitoring_sites.rds")
+monitoring <- readRDS("outputdata/monitoring.rds")
+
+ns_incidental_dist <- readRDS("outputdata/ns_incidental_dist.rds")
+ns_monitoring_dist <- readRDS("outputdata/ns_monitoring_dist.rds")
+nb_incidental_dist <- readRDS("outputdata/nb_incidental_dist.rds")
+nb_monitoring_dist <- readRDS("outputdata/nb_monitoring_dist.rds")
+pei_incidental_dist <- readRDS("outputdata/pei_incidental_dist.rds")
+pei_monitoring_dist <- readRDS("outputdata/pei_monitoring_dist.rds")
 
 greenCrabIcon <- makeIcon(
   iconUrl = "GreenCrab.png",
@@ -57,17 +103,17 @@ ui <- navbarPage(
                selectInput(inputId = "origlease",
                            label = "Choose a lease:",
                            choices = NS$Lease_Identifier),
-               numericInput(inputId = "origtunicatenum",
-                         label = "Number of Tunicate Sites",
+               numericInput(inputId = "origmonitoringnum",
+                         label = "Number of Biofouling Monitoring Sites",
                          value = 3),
-               numericInput(inputId = "origcrabnum",
-                         label = "Number of Green Crab Sites",
+               numericInput(inputId = "origincidentalnum",
+                         label = "Number of Incidental Observation Sites",
                          value = 3),
-               checkboxGroupInput(inputId = "origtunicatesite",
-                                  label = "Tunicate Monitoring Sites to Include",
+               checkboxGroupInput(inputId = "origmonitoringsite",
+                                  label = "Biofouling Monitoring Sites to Include",
                                   choices = "temp"),
-               checkboxGroupInput(inputId = "origcrabsite",
-                                  label = "Green Crab Sites to Include",
+               checkboxGroupInput(inputId = "origincidentalsite",
+                                  label = "Incidental Observation Sites to Include",
                                   choices = "temp")
              ),
              
@@ -88,17 +134,17 @@ ui <- navbarPage(
                selectInput(inputId = "destlease",
                            label = "Choose a lease:",
                            choices = NS$Lease_Identifier),
-               numericInput(inputId = "desttunicatenum",
-                         label = "Number of Tunicate Sites",
+               numericInput(inputId = "destmonitoringnum",
+                         label = "Number of Biofouling Monitoring Sites",
                          value = 3),
-               numericInput(inputId = "destcrabnum",
-                         label = "Number of Green Crab Sites",
+               numericInput(inputId = "destincidentalnum",
+                         label = "Number of Incidental Observation Sites",
                          value = 3),
-               checkboxGroupInput(inputId = "desttunicatesite",
-                                  label = "Tunicate Monitoring Sites to Include",
+               checkboxGroupInput(inputId = "destmonitoringsite",
+                                  label = "Biofouling Monitoring Sites to Include",
                                   choices = "temp"),
-               checkboxGroupInput(inputId = "destcrabsite",
-                                  label = "Green Crab Sites to Include",
+               checkboxGroupInput(inputId = "destincidentalsite",
+                                  label = "Incidental Observation Sites to Include",
                                   choices = "temp")
              ),
              
@@ -123,11 +169,11 @@ ui <- navbarPage(
   ),
   
   tabPanel("Settings",
-           numericInput(inputId = "tunicateyear",
-                        label = "Ignore Tunicate Records Older Than:",
-                        value = 2016),
-           numericInput(inputId = "greencrabyear",
-                        label = "Ignore Green Crab Older Than:",
+           numericInput(inputId = "monitoringyear",
+                        label = "Ignore Biofouling Monitoring Records Older Than:",
+                        value = 2013),
+           numericInput(inputId = "incidentalyear",
+                        label = "Ignore Incidental Observation Records Older Than:",
                         value = 2013) 
   )
   
@@ -135,11 +181,13 @@ ui <- navbarPage(
 
 #### Server Logic ####
 server <- function(input, output, session) {
-  tunicate_filtered <- reactive({
-    tunicates %>% 
-      filter(Year>=input$tunicateyear) %>% 
+  
+  monitoring_filtered <- reactive({
+    # browser()
+    monitoring %>% 
+      filter(Year>=input$monitoringyear) %>% 
       as.data.table() %>% 
-      select(-Shape) %>% 
+      dplyr::select(-geometry) %>% 
       gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
       group_by(Species,StnLocation) %>% 
       summarize(Presence = if_else(all(is.na(Presence)),
@@ -147,91 +195,102 @@ server <- function(input, output, session) {
                                    any(Presence>0,na.rm = TRUE))) %>% 
       ungroup() %>% 
       spread(key = "Species", value = "Presence") %>% 
-      inner_join(tunicates_sites,by = "StnLocation")
+      inner_join(monitoring_sites,by = "StnLocation")
   })
   
-  greencrab_filtered <- reactive({
-    greencrab %>% 
-      filter(Year>=input$greencrabyear) %>% 
+  incidental_filtered <- reactive({
+    incidental %>% 
+      filter(Year>=input$incidentalyear) %>% 
       as.data.table() %>% 
-      select(-Shape) %>% 
+      dplyr::select(-geometry) %>% 
       group_by(Species,StnLocation) %>% 
       summarize(Presence = TRUE) %>% 
       ungroup() %>% 
-      left_join(greencrab_sites,by = "StnLocation")
+      left_join(incidental_sites,by = "StnLocation")
   })
   
-  observe({
-    x <- input$destprov
-    dest <- destprovInput()
-    
-    updateSelectInput(session,
-                      "destlease",
-                      choices = dest$Lease_Identifier)
-    
-  })
-  
-  observe({
-    x <- input$origlease
+  observeEvent(input$origprov, {
+    #get provincial leases
     prov <- origprovInput()
-    lease <- origprovInput() %>% 
+    
+    
+    # update lease options
+    updateSelectInput(session,
+                      "origlease",
+                      choices = prov$Lease_Identifier)
+  })
+  
+  observeEvent(input$origlease, {
+    #get provincial leases
+    prov <- origprovInput()
+    # get correct lease
+    lease <- origprovInput() %>%
       filter(Lease_Identifier==input$origlease)
     
-    if(input$origtunicatenum!=""){
-      nearesttunicates <- nearestsites(lease,
+    
+    #update selectable sites
+    if(input$origmonitoringnum!=""){
+      nearestmonitoring <- nearestsites(lease,
                                        prov,
-                                       tunicate_filtered(),
-                                       as.numeric(input$origtunicatenum),
-                                       nstudist)
-
+                                       monitoring_filtered(),
+                                       as.numeric(input$origmonitoringnum),
+                                       monitoring_dist())
+      
       updateCheckboxGroupInput(session,
-                               "origtunicatesite",
-                               choices = nearesttunicates$StnLocation)
+                               "origmonitoringsite",
+                               choices = nearestmonitoring$StnLocation)
+      
     }
     
-    if(input$origcrabnum!=""){
-      nearestgreencrab <- nearestsites(lease,
+    if(input$origincidentalnum!=""){
+      nearestincidental <- nearestsites(lease,
                                        prov,
-                                       greencrab_filtered(),
-                                       as.numeric(input$origcrabnum),
-                                       nsgcdist)
-
+                                       incidental_filtered(),
+                                       as.numeric(input$origincidentalnum),
+                                       gcdist())
+      
       updateCheckboxGroupInput(session,
-                               "origcrabsite",
-                               choices = nearestgreencrab$StnLocation)
+                               "origincidentalsite",
+                               choices = nearestincidental$StnLocation)
     }
   })
   
-  observe({
-    x <- input$destlease
+  observeEvent(input$destlease, {
+    #get provincial leases
     prov <- destprovInput()
-    lease <- destprovInput() %>% 
+    # get correct lease
+    lease <- destprovInput() %>%
       filter(Lease_Identifier==input$destlease)
     
-    if(input$desttunicatenum!=""){
-      nearesttunicates <- nearestsites(lease,
+    
+    #update selectable sites
+    if(input$destmonitoringnum!=""){
+      nearestmonitoring <- nearestsites(lease,
                                        prov,
-                                       tunicate_filtered(),
-                                       as.numeric(input$desttunicatenum),
-                                       nstudist)
+                                       monitoring_filtered(),
+                                       as.numeric(input$destmonitoringnum),
+                                       monitoring_dist())
       
       updateCheckboxGroupInput(session,
-                               "desttunicatesite",
-                               choices = nearesttunicates$StnLocation)
+                               "destmonitoringsite",
+                               choices = nearestmonitoring$StnLocation)
+      
     }
     
-    if(input$destcrabnum!=""){
-      nearestgreencrab <- nearestsites(lease,
+    if(input$destincidentalnum!=""){
+      nearestincidental <- nearestsites(lease,
                                        prov,
-                                       greencrab_filtered(),
-                                       as.numeric(input$destcrabnum),
-                                       nsgcdist)
+                                       incidental_filtered(),
+                                       as.numeric(input$destincidentalnum),
+                                       gcdist())
       
       updateCheckboxGroupInput(session,
-                               "destcrabsite",
-                               choices = nearestgreencrab$StnLocation)
+                               "destincidentalsite",
+                               choices = nearestincidental$StnLocation)
     }
   })
+  
+
   
   
   origprovInput <- reactive({
@@ -248,127 +307,146 @@ server <- function(input, output, session) {
            "PEI" = PEI)
   })
   
+  monitoring_dist <- reactive({
+    switch(input$origprov,
+           "NS" = ns_monitoring_dist,
+           "NB" = nb_monitoring_dist,
+           "PEI" = pei_monitoring_dist)
+  })
+  
+  gcdist <- reactive({
+    switch(input$origprov,
+           "NS" = ns_incidental_dist,
+           "NB" = nb_incidental_dist,
+           "PEI" = pei_incidental_dist)
+  })
+  
+  #### Leaflet maps ####
   
   output$leafletmap <- renderLeaflet({
     basemap(leases=NS,
-            crabs=greencrab_filtered(),
-            tunicates=tunicate_filtered(),
-            tunicatesp=tunicatesp)
+            incidentals=incidental_filtered(),
+            monitoring=monitoring_filtered(),
+            monitoringsp=AIS$Scientific_Name)
   })
-   
-  
+
+
   output$leafletorig <- renderLeaflet({
-    lease <- origprovInput() %>% 
+    # browser()
+    lease <- origprovInput() %>%
       filter(Lease_Identifier==input$origlease)
-    
+
     prov <- origprovInput()
-    
-    
-    if(input$origtunicatenum!=""){
-      nearesttunicates <- nearestsites(lease,
+
+
+    if(input$origmonitoringnum!=""){
+      nearestmonitoring <- nearestsites(lease,
                                        prov,
-                                       tunicate_filtered(),
-                                       as.numeric(input$origtunicatenum),
-                                       nstudist)
+                                       monitoring_filtered(),
+                                       as.numeric(input$origmonitoringnum),
+                                       ns_monitoring_dist)
     }
-    
-    if(input$origcrabnum!=""){
-      nearestgreencrab <- nearestsites(lease,
+
+    if(input$origincidentalnum!=""){
+      nearestincidental <- nearestsites(lease,
                                        prov,
-                                       greencrab_filtered(),
-                                       as.numeric(input$origcrabnum),
-                                       nsgcdist)
+                                       incidental_filtered(),
+                                       as.numeric(input$origincidentalnum),
+                                       ns_incidental_dist)
     }
-    
-    if(input$origcrabnum!="" & input$origtunicatenum!=""){
+
+    if(input$origincidentalnum!="" & input$origmonitoringnum!=""){
       basemap(leases=lease,
-              crabs=nearestgreencrab,
-              tunicates=nearesttunicates,
-              tunicatesp=tunicatesp)
+              incidentals=nearestincidental,
+              monitoring=nearestmonitoring,
+              monitoringsp=AIS$Scientific_Name)
+    }
+  })
+
+  output$leafletdest <- renderLeaflet({
+    lease <- destprovInput() %>%
+      filter(Lease_Identifier==input$destlease)
+
+    prov <- destprovInput()
+
+
+    if(input$destmonitoringnum!=""){
+      nearestmonitoring <- nearestsites(lease,
+                                       prov,
+                                       monitoring_filtered(),
+                                       as.numeric(input$destmonitoringnum),
+                                       ns_monitoring_dist)
+    }
+
+    if(input$destincidentalnum!=""){
+      nearestincidental <- nearestsites(lease,
+                                       prov,
+                                       incidental_filtered(),
+                                       as.numeric(input$destincidentalnum),
+                                       ns_incidental_dist)
+    }
+
+    if(input$destincidentalnum!="" & input$destmonitoringnum!=""){
+      basemap(leases=lease,
+              incidentals=nearestincidental,
+              monitoring=nearestmonitoring,
+              monitoringsp=AIS$Scientific_Name)
     }
   })
   
-  output$leafletdest <- renderLeaflet({
-    lease <- destprovInput() %>% 
-      filter(Lease_Identifier==input$destlease)
-    
-    prov <- destprovInput()
-    
-    
-    if(input$desttunicatenum!=""){
-      nearesttunicates <- nearestsites(lease,
-                                       prov,
-                                       tunicate_filtered(),
-                                       as.numeric(input$desttunicatenum),
-                                       nstudist)
-    }
-    
-    if(input$destcrabnum!=""){
-      nearestgreencrab <- nearestsites(lease,
-                                       prov,
-                                       greencrab_filtered(),
-                                       as.numeric(input$destcrabnum),
-                                       nsgcdist)
-    }
-    
-    if(input$destcrabnum!="" & input$desttunicatenum!=""){
-      basemap(leases=lease,
-              crabs=nearestgreencrab,
-              tunicates=nearesttunicates,
-              tunicatesp=tunicatesp)
-    }
-  })
+  #### summary ####
   
   summaryValues <- reactive({
     print("Generating Summary")
-    if(is.null(input$origtunicatesite)&
-       is.null(input$origcrabsite)&
-       is.null(input$desttunicatesite)&
-       is.null(input$destcrabsite)){
+    # browser()
+    if(is.null(input$origmonitoringsite)&
+       is.null(input$origincidentalsite)&
+       is.null(input$destmonitoringsite)&
+       is.null(input$destincidentalsite)){
       summary <- data.frame(
         Site = "No Origin or Destination sites selected"
       )
-    } else if(is.null(input$origtunicatesite)&
-              is.null(input$origcrabsite)){
+    } else if(is.null(input$origmonitoringsite)&
+              is.null(input$origincidentalsite)){
       summary <- data.frame(
         Site = "No Origin  sites selected"
       )
-    }else if(is.null(input$desttunicatesite)&
-             is.null(input$destcrabsite)){
+    }else if(is.null(input$destmonitoringsite)&
+             is.null(input$destincidentalsite)){
       summary <- data.frame(
         Site = "No Destination sites selected"
       )
     } else {
-      if(!is.null(input$origtunicatesite)){
-        origin <- tunicate_filtered() %>% 
-          filter(StnLocation %in% gsub("\\s*\\([^\\)]+\\)","",input$origtunicatesite)) %>% 
+      if(!is.null(input$origmonitoringsite)){
+        origin <- monitoring_filtered() %>% 
+          filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>% 
           data.frame() %>% 
           gather(key="Species",value="Presence",-StnLocation) %>% 
-          filter(Species %in% tunicatesp) %>% 
+          filter(Species %in% monitoringsp) %>% 
           group_by(Species) %>% 
           summarize(Presence = any(as.logical(Presence)))
       }else {
         origin <- data.frame("Species"=character(0),"Presence"=logical(0))
       }
       
-      if(!is.null(input$desttunicatesite)){  
-        destination <- tunicate_filtered() %>% 
-          filter(StnLocation %in% gsub("\\s*\\([^\\)]+\\)","",input$desttunicatesite)) %>% 
+      if(!is.null(input$destmonitoringsite)){  
+        destination <- monitoring_filtered() %>% 
+          filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>% 
           data.frame() %>% 
           gather(key="Species",value="Presence",-StnLocation) %>% 
-          filter(Species %in% tunicatesp) %>% 
+          filter(Species %in% monitoringsp) %>% 
           group_by(Species) %>% 
           summarize(Presence = any(as.logical(Presence)))
       } else {
         destination <- data.frame("Species"=character(0),"Presence"=logical(0))
       }
       
-      if(!is.null(input$origcrabsite)){
+      if(!is.null(input$origincidentalsite)){
         origin <- origin %>%
           bind_rows(data.frame("Species"="Carcinus_maenas","Presence"=TRUE))
       }
 
-      if(!is.null(input$destcrabsite)){
+      if(!is.null(input$destincidentalsite)){
         destination <- destination %>%
           bind_rows(data.frame("Species"="Carcinus_maenas","Presence"=TRUE))
       }
@@ -402,7 +480,7 @@ server <- function(input, output, session) {
                                       "")) %>%
           filter(Mitigation!="") %>%
           left_join(mitigations,by=c("Species"="Scientific_Name")) %>% 
-          select(Species, Common_Name, Product_treated, Treatment_proposed) %>% 
+          dplyr::select(Species, Common_Name, Product_treated, Treatment_proposed) %>% 
           filter(Product_treated %in% input$product)
       } else {
         summarymitigation <- data.frame(
