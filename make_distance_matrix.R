@@ -1,3 +1,8 @@
+if(!require("spocc")) install.packages("spocc")
+if(!require("robis")) install.packages("robis")
+if(!require("robis")) install.packages("robis")
+if(!require("devtools")) install.packages("devtools")
+if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
 if(!require("sf")) install.packages("sf")
 if(!require("raster")) install.packages("raster")
 if(!require("fasterize")) install.packages("fasterize")
@@ -10,59 +15,182 @@ print("Warning: Initial installation will take multiple hours!")
 #### global variables ####
 
 print("Loading data")
-gdbpath <- "//ent.dfo-mpo.ca/ATLShares/Shared/ButlerS/Interactive Map Tool/ArcGIS/PMF_Working.gdb"
-# gdbpath <- "~/../Desktop/Interactive Map Tool/AIS/Working/PMF_Working.gdb/"
 proj <- "+proj=longlat +datum=WGS84"
+equidist <- "+proj=eqdc +lon_0=-63.5888672 +lat_1=43.9161943 +lat_2=48.3348844 +lat_0=46.1255394 +datum=WGS84 +units=m +no_defs"
 
-NS <- read_sf(gdbpath, layer="NS_Aquaculture_Leases_2018") %>% st_transform(crs=proj)
-# PEI <- read_sf(gdbpath, layer="PEI_Aquaculture_Leases_2019") %>% st_transform(crs=proj)
-# NB <- read_sf(gdbpath, layer="NB_Aquaculture_Leases_2019") %>% st_transform(crs=proj)
 
-# load and clean up data
-greencrab_all <- read_sf(gdbpath, layer="GreenCrab_Occurrences_DiBacco") %>% 
+
+NS <- readRDS("spatialdata/NS.rds")
+NB <- readRDS("spatialdata/NB.rds")
+PEI <- readRDS("spatialdata/PEI.rds")
+
+species <- read.csv("commonnames.csv")
+
+
+
+# Load and clean up incidental data ---------------------------------------
+
+searcharea <- c(NS$geoms,NB$geoms,PEI$geometry) %>% 
+  st_combine() %>% 
+  st_convex_hull() %>% 
+  st_transform(equidist) %>% 
+  st_buffer(100000) %>% 
+  st_transform(proj)
+
+incidental_occ <- occ(query=species$Scientific_Name,
+                      from=c("gbif","inat"),
+                      geometry = st_bbox(searcharea),
+                      has_coords = TRUE,
+                      limit=10000) %>% 
+  occ2df() %>% 
+  mutate(StnLocation=paste0("within 1.1km of lon ",round(as.numeric(longitude),2)," lat ",round(as.numeric(latitude),2))) %>% 
+  st_as_sf(coords=c('longitude','latitude'),crs=4326)%>% 
   st_transform(crs=proj) %>% 
-  filter(Lon<(-59)) %>% 
-  mutate(StnLocation = LOCATION_N) 
+  mutate(link=case_when(prov=="gbif" ~ paste0("https://www.gbif.org/occurrence/",key),
+                        prov=="inat" ~ paste0("https://www.inaturalist.org/observations/",key)
+  )) %>% 
+  mutate(Species=case_when(name %in% c("Ascidiella aspersa (Müller, 1776)") ~ "Ascidiella aspersa",
+                           name %in% c("BOLD:AAA7687","BOLD:ACL8382","Carcinus maenas (Linnaeus, 1758)") ~ "Carcinus maenas",
+                           name %in% c("Botrylloides violaceus Oka, 1927") ~ "Botrylloides violaceus",
+                           name %in% c("Botryllus schlosseri (Pallas, 1766)") ~ "Botryllus schlosseri",
+                           name %in% c("Caprella mutica Schurin, 1935") ~ "Caprella mutica",
+                           name %in% c("Ciona intestinalis (Linnaeus, 1767)","Ciona intestinalis tenella (Stimpson, 1852)","Ciona tenella (Stimpson, 1852)") ~ "Ciona intestinalis",
+                           name %in% c("Codium fragile (Suringar) Hariot","Codium fragile subsp. fragile","Codium fragile subsp. tomentosoides (Goor) P.C.Silva","Codium fragile tomentosoides") ~ "Codium fragile",
+                           name %in% c("Didemnum vexillum Kott, 2002") ~ "Didemnum vexillum",
+                           name %in% c("Hemigrapsus sanguineus (De Haan, 1835)") ~ "Hemigrapsus sanguineus",
+                           name %in% c("Membranipora membranacea (Linnaeus, 1767)") ~ "Membranipora membranacea",
+                           name %in% c("Styela clava Herdman, 1881") ~ "Styela clava",
+                           TRUE ~ name),
+         Year=as.numeric(substr(date,1,4)))
 
-greencrab_sites <- greencrab_all %>% 
+if(!all(sort(unique(incidental_occ$Species)) %in% sort(species$Scientific_Name))){
+  sp <- sort(unique(incidental_occ$Species))[!sort(unique(incidental_occ$Species)) %in% sort(species$Scientific_Name)]
+  warning(paste0(sp," is not found in a recognized species name, rename in `incidental_occ` which is in `make_distance_matrix.R`"))
+}
+
+
+gulf_tunicate_incidental <- readxl::read_excel("recentdata/Gulf AIS data_biof_monit_incidental_AISNCP MAR_April 2021.xlsx",sheet=2,col_types =  "text") %>%
+  mutate('Longitude (W)'=case_when(`Latitude (N)`=="*waiting for coordinate"~-61.91,   #fixing bad data entry
+                                   `Longitude (W)`>0~as.numeric(`Longitude (W)`)*-1,
+                                   TRUE~as.numeric(`Longitude (W)`)),
+         'Latitude (N)'=case_when(`Latitude (N)`=="*waiting for coordinate"~"45.88",
+                                  TRUE~`Latitude (N)`),
+         'Latitude (N)'=as.numeric(`Latitude (N)`),
+         Year=as.numeric(Year))%>% 
+  filter(!is.na(`Longitude (W)`)) %>%
+  st_as_sf(coords=c('Longitude (W)','Latitude (N)'),crs=4326)%>% 
+  dplyr::rename(StnLocation=Location,
+                "Botryllus_schlosseri"="B schlosseri",
+                "Botrylloides_violaceus"="B violaceus",
+                "Ciona_intestinalis"="C intestinalis",
+                "Styela_clava"="S clava",
+                "Caprella_mutica"="C mutica",
+                "Membranipora_membranacea"="M membranacea", 
+                "Carcinus_maenas"="C maenas",
+                "Codium_fragile"="C fragile") %>% 
+  dplyr::select(-Province,-Comments) %>% 
+  gather(key = "Species", value = "Presence",-StnLocation,-Year,-geometry) %>% 
+  group_by(Species,StnLocation,Year) %>% 
+  summarize(Presence = if_else(all(is.na(Presence)),
+                               FALSE,
+                               any(Presence>0,na.rm = TRUE))) %>% 
+  ungroup() %>% 
+  filter(Presence) %>% 
+  mutate(Species=gsub("_"," ",Species),
+         prov="Gulf Science Data contact Renee.Bernier@dfo-mpo.gc.ca") %>% 
+  st_cast('POINT')
+
+if(!all(sort(unique(gulf_tunicate_incidental$Species)) %in% sort(species$Scientific_Name))){
+  sp <- sort(unique(gulf_tunicate_incidental$Species))[!sort(unique(gulf_tunicate_incidental$Species)) %in% sort(species$Scientific_Name)]
+  warning(paste0(sp," is not found in a recognized species name, rename in `gulf_tunicate_incidental` which is in `make_distance_matrix.R`"))
+}
+
+incidental_sites <- rbind(incidental_occ %>% 
+                            dplyr::select(StnLocation) ,
+                          gulf_tunicate_incidental %>% 
+                            dplyr::select(StnLocation)) %>% 
   group_by(StnLocation) %>% 
-  summarize(Shape = st_cast(st_centroid(st_union(Shape)),"POINT")) %>% 
-  unique()
+  summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
+  unique() 
 
-greencrab <- greencrab_all %>% 
-  as.data.table() %>% 
-  mutate(Year = YEAR_Colle,
-         Species = "Carcinus maenas") %>% 
-  dplyr::select(Species,StnLocation,Year) %>% 
-  left_join(greencrab_sites,by = "StnLocation") %>% 
+incidental <- bind_rows(incidental_occ %>%
+                          as.data.table(),
+                        gulf_tunicate_incidental %>%
+                          as.data.table()) %>% 
+  dplyr::select(Species,StnLocation,Year,prov,link) %>% 
+  left_join(incidental_sites,by = "StnLocation") %>% 
   st_sf()
-saveRDS(greencrab_sites,"greencrab_sites.rds")
-saveRDS(greencrab,"greencrab.rds")
+saveRDS(incidental_sites,"outputdata/incidental_sites.rds")
+saveRDS(incidental,"outputdata/incidental.rds")
 
 
-tunicates2018 <- read_sf(gdbpath, layer="Tunicate_Community_Composition_2018") %>% 
-  st_transform(crs=proj) %>% 
-  dplyr::select(-Region,-Lat,-Long_,-StnNum) %>% 
-  mutate(Year=2018)
+# Load and clean up monitoring data ---------------------------------------
 
-tunicates_all <- read_sf(gdbpath, layer="CESD_Aquatic_Invasive_Tunicates") %>% 
-  st_transform(crs=proj)%>% 
-  mutate(Year = Year_Observed) %>% 
-  dplyr::select(-Year_Observed,-Latitude,-Longitude,-FCName,-StnNum,-Prov,-sampler,-StnDescription,-StructureType) 
+# Maritimes Tunicates
+maritimes_tunicate_monitor <- rbind(esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/1"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/7"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/13"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/19"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/25"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/34"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/43"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/54"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/66"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/79"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/92"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/104"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/117"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/136"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/154"))%>% 
+  dplyr::rename(geometry=geoms,Year = Year_Observed)%>% 
+  st_transform(proj) %>% 
+  dplyr::select(-OBJECTID,-Latitude,-Longitude,-FCName,-Prov,-sampler,-StnDescription,-StructureType,-StnNum)
 
-tunicates_sites <- rbind(tunicates_all %>% 
-                         dplyr::select(StnLocation),
-                       tunicates2018 %>% 
-                         dplyr::select(StnLocation)) %>% 
+
+maritimes_tunicate_new <- read.csv("recentdata/AIS_2020_present_absent.csv")%>% 
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>% 
+  dplyr::rename(Didemnum_vexillum=Didemnum_Vexillum)%>% 
+  st_transform(proj)%>% 
+  dplyr::select(-Region,-StnNum)
+
+
+# Gulf Tunicates
+# gulf_tunicate_monitor <- esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Gulf_Region_Aquatic_Invasive_Species_Data/MapServer/0")
+# the above Gulf data is included in the xlsx file below
+
+
+gulf_tunicate_monitor <- readxl::read_excel("recentdata/Gulf AIS data_biof_monit_incidental_AISNCP MAR_April 2021.xlsx") %>% 
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
+  dplyr::rename(StnLocation=Station,
+                "Botryllus_schlosseri"="B schlosseri",
+                "Botrylloides_violaceus"="B violaceus",
+                "Ciona_intestinalis"="C intestinalis",
+                "Styela_clava"="S clava",
+                "Caprella_mutica"="C mutica",
+                "Membranipora_membranacea"="M membranacea", 
+                "Carcinus_maenas"="C maenas",
+                "Codium_fragile"="C fragile")
+
+
+
+monitoring_sites <- rbind(maritimes_tunicate_new %>% 
+                            dplyr::select(StnLocation) ,
+                          maritimes_tunicate_monitor %>% 
+                            dplyr::select(StnLocation),
+                          gulf_tunicate_monitor %>% 
+                            dplyr::select(StnLocation)) %>% 
   group_by(StnLocation) %>% 
-  summarize(Shape = st_cast(st_centroid(st_union(Shape)),"POINT")) %>% 
-  unique()
+  summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
+  unique() %>% 
+  mutate(StnLocation=gsub("[ \t]+$","",StnLocation))
 
-tunicates <- bind_rows(tunicates_all %>% 
-                         as.data.table(),
-                       tunicates2018 %>% 
-                         as.data.table()) %>% 
-  dplyr::select(-Shape) %>% 
+monitoring <- bind_rows(maritimes_tunicate_new %>% 
+                          as.data.table(),
+                        maritimes_tunicate_monitor %>% 
+                          as.data.table(),
+                        gulf_tunicate_monitor %>% 
+                          as.data.table()) %>% 
+  dplyr::select(-geometry) %>% 
   gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
   group_by(Species,StnLocation,Year) %>% 
   summarize(Presence = if_else(all(is.na(Presence)),
@@ -70,55 +198,82 @@ tunicates <- bind_rows(tunicates_all %>%
                                any(Presence>0,na.rm = TRUE))) %>% 
   ungroup() %>% 
   spread(key = "Species", value = "Presence") %>% 
-  left_join(tunicates_sites,by = "StnLocation") %>% 
-  st_sf() 
-saveRDS(tunicates_sites,"tunicates_sites.rds")
-saveRDS(tunicates,"tunicates.rds")
+  left_join(monitoring_sites,by = "StnLocation") %>% 
+  st_sf() %>% 
+  mutate(StnLocation=gsub("[ \t]+$","",StnLocation))
+
+# leaflet::leaflet(monitoring_sites) %>% addTiles() %>% addMarkers()
+
+saveRDS(monitoring_sites,"outputdata/monitoring_sites.rds")
+saveRDS(monitoring,"outputdata/monitoring.rds")
 
 
-bbox <- st_bbox(st_buffer(rbind(tunicates_sites,greencrab_sites),2))
-
-if(!file.exists("gshhg-shp-2.3.7")){
+if(!file.exists("spatialdata/gshhg-shp-2.3.7.zip")){
   print("Downloading Coastline")
   curl::curl_download(url="http://www.soest.hawaii.edu/pwessel/gshhg/gshhg-shp-2.3.7.zip",
-                      destfile = "gshhg-shp-2.3.7.zip")
-  utils::unzip("gshhg-shp-2.3.7.zip")
+                      destfile = "spatialdata/gshhg-shp-2.3.7.zip")
+  utils::unzip("spatialdata/gshhg-shp-2.3.7.zip",exdir="spatialdata")
 }
 
 
 # GSHHS is from http://www.soest.hawaii.edu/pwessel/gshhs/index.html
-maritimes <- st_read("GSHHS_shp/f/GSHHS_f_L1.shp")%>%
-  st_crop(bbox)%>% 
+maritimes <- st_read("spatialdata/GSHHS_shp/f/GSHHS_f_L1.shp") %>% 
+  filter(st_is_valid(geometry)) %>%
+  st_transform(equidist) %>% 
+  st_crop(st_bbox(st_transform(searcharea,equidist))) %>% 
   st_union() %>% 
   st_cast('POLYGON') %>% 
-  st_sf()
+  st_sf() 
 
 source("functions.R")
 
 #### set up transition matrix ####
 
 print("Setting up transition matrix")
-r <- raster(maritimes,
-            ext=extent(c(-68.5,-59,43,47.5)),
-            # ext=extent(c(-61.3,-60.7,45.5,45.7)),
-            res = 0.0025) # this SHOULD be ~0.0025
+r <- raster(maritimes ,
+            ext=extent(st_bbox(searcharea %>% st_transform(equidist))),
+            res = 2000)
 r <- fasterize(maritimes, r)
 r@data@values[r@data@values==1] <- 1
 r@data@values[is.na(r@data@values)] <- 10000
 plot(r)
 tr <- transition(r, mean, directions = 16, symm=TRUE)
-saveRDS(tr,"transition.rds")
+saveRDS(tr,"outputdata/transition.rds")
+
+#### NS vs  incidentals and monitoring ####
+
+print("Calculating in water distances for NS")
+ns_incidental_dist <- do.call(rbind,(lapply(NS$geoms, function(x) inwaterdistance(incidental_sites,x,tr))))
+row.names(ns_incidental_dist) <- NS$Lease_Identifier
+colnames(ns_incidental_dist) <- incidental_sites$StnLocation
+saveRDS(ns_incidental_dist,"outputdata/ns_incidental_dist.rds")
+ns_monitoring_dist <- do.call(rbind,(lapply(NS$geoms, function(x) inwaterdistance(monitoring_sites,x,tr))))
+row.names(ns_monitoring_dist) <- NS$Lease_Identifier
+colnames(ns_monitoring_dist) <- monitoring_sites$StnLocation
+saveRDS(ns_monitoring_dist,"outputdata/ns_monitoring_dist.rds")
+
+#### NB vs  incidentals and monitoring ####
+
+print("Calculating in water distances for NB")
+nb_incidental_dist <- do.call(rbind,(lapply(NB$geoms, function(x) inwaterdistance(incidental_sites,x,tr))))
+row.names(nb_incidental_dist) <- NB$Lease_Identifier
+colnames(nb_incidental_dist) <- incidental_sites$StnLocation
+saveRDS(nb_incidental_dist,"outputdata/nb_incidental_dist.rds")
+nb_monitoring_dist <- do.call(rbind,(lapply(NB$geoms, function(x) inwaterdistance(monitoring_sites,x,tr))))
+row.names(nb_monitoring_dist) <- NB$Lease_Identifier
+colnames(nb_monitoring_dist) <- monitoring_sites$StnLocation
+saveRDS(nb_monitoring_dist,"outputdata/nb_monitoring_dist.rds")
 
 
-#### NS vs green crabs and tunicates ####
+#### PEI vs  incidentals and monitoring ####
 
-print("Calculating in water distances")
-nsgcdist <- do.call(rbind,(lapply(NS$Shape, function(x) inwaterdistance(greencrab_sites,x,tr))))
-row.names(nsgcdist) <- NS$Lease_Identifier
-colnames(nsgcdist) <- greencrab_sites$StnLocation
-saveRDS(nsgcdist,"nsgcdist.rds")
-nstudist <- do.call(rbind,(lapply(NS$Shape, function(x) inwaterdistance(tunicates_sites,x,tr))))
-row.names(nstudist) <- NS$Lease_Identifier
-colnames(nstudist) <- tunicates_sites$StnLocation
-saveRDS(nstudist,"nstudist.rds")
 
+print("Calculating in water distances for PEI")
+pei_incidental_dist <- do.call(rbind,(lapply(PEI$geometry, function(x) inwaterdistance(incidental_sites,x,tr))))
+row.names(pei_incidental_dist) <- PEI$Lease_Identifier
+colnames(pei_incidental_dist) <- incidental_sites$StnLocation
+saveRDS(pei_incidental_dist,"outputdata/pei_incidental_dist.rds")
+pei_monitoring_dist <- do.call(rbind,(lapply(PEI$geometry, function(x) inwaterdistance(monitoring_sites,x,tr))))
+row.names(pei_monitoring_dist) <- PEI$Lease_Identifier
+colnames(pei_monitoring_dist) <- monitoring_sites$StnLocation
+saveRDS(pei_monitoring_dist,"outputdata/pei_monitoring_dist.rds")
