@@ -16,7 +16,7 @@ print("Warning: Initial installation will take multiple hours!")
 
 print("Loading data")
 proj <- "+proj=longlat +datum=WGS84"
-equidist <- "+proj=eqdc +lon_0=-63.5888672 +lat_1=43.9161943 +lat_2=48.3348844 +lat_0=46.1255394 +datum=WGS84 +units=m +no_defs"
+equidist <- "+proj=eqdc +lon_0=-63.59 +lat_1=43.92 +lat_2=48.33 +lat_0=46.13 +x_0=1000000 +y_0=1000000 +datum=WGS84 +units=m +no_defs"
 
 
 
@@ -36,6 +36,7 @@ searcharea <- c(NS$geoms,NB$geoms,PEI$geometry) %>%
   st_transform(equidist) %>% 
   st_buffer(100000) %>% 
   st_transform(proj)
+
 
 incidental_occ <- occ(query=species$Scientific_Name,
                       from=c("gbif","inat"),
@@ -111,14 +112,19 @@ incidental_sites <- rbind(incidental_occ %>%
                             dplyr::select(StnLocation)) %>% 
   group_by(StnLocation) %>% 
   summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
-  unique() 
+  unique() %>% 
+  st_transform(equidist) %>% 
+  filter(geometry%>% 
+           st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
+           lengths()>0) %>% 
+  st_transform(proj)
 
 incidental <- bind_rows(incidental_occ %>%
                           as.data.table(),
                         gulf_tunicate_incidental %>%
                           as.data.table()) %>% 
   dplyr::select(Species,StnLocation,Year,prov,link) %>% 
-  left_join(incidental_sites,by = "StnLocation") %>% 
+  right_join(incidental_sites,by = "StnLocation") %>% 
   st_sf()
 saveRDS(incidental_sites,"outputdata/incidental_sites.rds")
 saveRDS(incidental,"outputdata/incidental.rds")
@@ -182,7 +188,12 @@ monitoring_sites <- rbind(maritimes_tunicate_new %>%
   group_by(StnLocation) %>% 
   summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
   unique() %>% 
-  mutate(StnLocation=gsub("[ \t]+$","",StnLocation))
+  mutate(StnLocation=gsub("[ \t]+$","",StnLocation)) %>% 
+  st_transform(equidist) %>% 
+  filter(geometry%>% 
+           st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
+           lengths()>0) %>% 
+  st_transform(proj)
 
 monitoring <- bind_rows(maritimes_tunicate_new %>% 
                           as.data.table(),
@@ -198,7 +209,7 @@ monitoring <- bind_rows(maritimes_tunicate_new %>%
                                any(Presence>0,na.rm = TRUE))) %>% 
   ungroup() %>% 
   spread(key = "Species", value = "Presence") %>% 
-  left_join(monitoring_sites,by = "StnLocation") %>% 
+  right_join(monitoring_sites,by = "StnLocation") %>% 
   st_sf() %>% 
   mutate(StnLocation=gsub("[ \t]+$","",StnLocation))
 
@@ -232,7 +243,7 @@ source("functions.R")
 print("Setting up transition matrix")
 r <- raster(maritimes ,
             ext=extent(st_bbox(searcharea %>% st_transform(equidist))),
-            res = 2000)
+            res = 1000)
 r <- fasterize(maritimes, r)
 r@data@values[r@data@values==1] <- 1
 r@data@values[is.na(r@data@values)] <- 10000
@@ -240,14 +251,27 @@ plot(r)
 tr <- transition(r, mean, directions = 16, symm=TRUE)
 saveRDS(tr,"outputdata/transition.rds")
 
+
 #### NS vs  incidentals and monitoring ####
 
 print("Calculating in water distances for NS")
-ns_incidental_dist <- do.call(rbind,(lapply(NS$geoms, function(x) inwaterdistance(incidental_sites,x,tr))))
+ns_incidental_dist <- do.call(rbind,(lapply(NS$geoms %>%
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(incidental_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
 row.names(ns_incidental_dist) <- NS$Lease_Identifier
 colnames(ns_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(ns_incidental_dist,"outputdata/ns_incidental_dist.rds")
-ns_monitoring_dist <- do.call(rbind,(lapply(NS$geoms, function(x) inwaterdistance(monitoring_sites,x,tr))))
+
+
+ns_monitoring_dist <- do.call(rbind,(lapply(NS$geoms %>%
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(monitoring_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
 row.names(ns_monitoring_dist) <- NS$Lease_Identifier
 colnames(ns_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(ns_monitoring_dist,"outputdata/ns_monitoring_dist.rds")
@@ -255,11 +279,23 @@ saveRDS(ns_monitoring_dist,"outputdata/ns_monitoring_dist.rds")
 #### NB vs  incidentals and monitoring ####
 
 print("Calculating in water distances for NB")
-nb_incidental_dist <- do.call(rbind,(lapply(NB$geoms, function(x) inwaterdistance(incidental_sites,x,tr))))
+nb_incidental_dist <- do.call(rbind,(lapply(NB$geoms %>%
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(incidental_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
 row.names(nb_incidental_dist) <- NB$Lease_Identifier
 colnames(nb_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(nb_incidental_dist,"outputdata/nb_incidental_dist.rds")
-nb_monitoring_dist <- do.call(rbind,(lapply(NB$geoms, function(x) inwaterdistance(monitoring_sites,x,tr))))
+
+
+nb_monitoring_dist <- do.call(rbind,(lapply(NB$geoms %>%
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(monitoring_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
 row.names(nb_monitoring_dist) <- NB$Lease_Identifier
 colnames(nb_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(nb_monitoring_dist,"outputdata/nb_monitoring_dist.rds")
@@ -269,11 +305,21 @@ saveRDS(nb_monitoring_dist,"outputdata/nb_monitoring_dist.rds")
 
 
 print("Calculating in water distances for PEI")
-pei_incidental_dist <- do.call(rbind,(lapply(PEI$geometry, function(x) inwaterdistance(incidental_sites,x,tr))))
+pei_incidental_dist <- do.call(rbind,(lapply(PEI$geometry %>%
+                                               st_transform(equidist),
+                                             function(x) inwaterdistance(incidental_sites %>%
+                                                                           st_transform(equidist),
+                                                                         x,
+                                                                         tr))))
 row.names(pei_incidental_dist) <- PEI$Lease_Identifier
 colnames(pei_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(pei_incidental_dist,"outputdata/pei_incidental_dist.rds")
-pei_monitoring_dist <- do.call(rbind,(lapply(PEI$geometry, function(x) inwaterdistance(monitoring_sites,x,tr))))
+pei_monitoring_dist <- do.call(rbind,(lapply(PEI$geometry %>%
+                                               st_transform(equidist),
+                                             function(x) inwaterdistance(monitoring_sites %>%
+                                                                           st_transform(equidist),
+                                                                         x,
+                                                                         tr))))
 row.names(pei_monitoring_dist) <- PEI$Lease_Identifier
 colnames(pei_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(pei_monitoring_dist,"outputdata/pei_monitoring_dist.rds")

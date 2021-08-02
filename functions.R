@@ -9,15 +9,28 @@ inwaterdistance <- function(origin, destination, transition){
 
 #### nearestsites ####
 nearestsites <- function(lease,prov,sites,n,distmat){
-  # browser()
+  # if("MF-0491"==lease$Lease_Identifier){browser()}
+  if(length(lease$Lease_Identifier)==0){
+    stop("Invalid lease identifier (lease error)")
+  }
+  if(!lease$Lease_Identifier %in% prov$Lease_Identifier){
+    stop("Invalid lease identifier (prov error")
+  }
+  if(!lease$Lease_Identifier %in% row.names(distmat)){
+    browser()
+    stop("Invalid lease identifier (distmat error)")
+  }
+  
   print("calculating nearest sites")
   distances <- data.table(StnLocation=colnames(distmat),
-                          distance=distmat[row.names(distmat)==lease$Lease_Identifier,]) 
+                          distance=distmat[row.names(distmat)==as.character(lease$Lease_Identifier),]) 
+  
+  # if(ncol(distances)!=2){
+  #   browser()
+  # }
     
   sites %>%
     left_join(distances, by = "StnLocation") %>% 
-    # mutate(distance = distmat[lease$Lease_Identifier==row.names(distmat),]) %>% 
-    # top_n(-n,distance) %>% 
     top_n(-n,distance) %>% 
     arrange(distance) %>% 
     mutate(StnLocation = paste0(StnLocation," (",round(distance/1000)," km)"))
@@ -36,7 +49,7 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp){
   html_legend <- paste0("<img src='",getwd(),"/",greenCrabIcon$iconUrl,"'>  Green Crab")
   
   
-  sp <- gsub(" ","_",monitoringsp)[gsub(" ","_",monitoringsp) %in% names(monitoring)]
+  sp <- monitoringsp[monitoringsp %in% names(monitoring)]
   
   leaflet(leases) %>%
     addTiles() %>%

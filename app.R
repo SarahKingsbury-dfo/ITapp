@@ -8,13 +8,8 @@ if(!require("data.table")) install.packages("data.table")
 if(!require("tidyverse")) install.packages("tidyverse")
 
 #### global variables ####
-# gdbpath <- "//ent.dfo-mpo.ca/ATLShares/Shared/ButlerS/Interactive Map Tool/ArcGIS/PMF_Working.gdb"
-# gdbpath <- "~/../Desktop/Interactive Map Tool/AIS/Working/PMF_Working.gdb/"
-proj <- "+proj=longlat +datum=WGS84"
 
-# NS <- read_sf(gdbpath, layer="NS_Aquaculture_Leases_2018") %>% st_transform(crs=proj)
-# PEI <- read_sf(gdbpath, layer="PEI_Aquaculture_Leases_2019") %>% st_transform(crs=proj)
-# NB <- read_sf(gdbpath, layer="NB_Aquaculture_Leases_2019") %>% st_transform(crs=proj)
+proj <- "+proj=longlat +datum=WGS84"
 
 
 ### download provincial lease data or just open the saved version
@@ -26,8 +21,7 @@ if(!file.exists("spatialdata/NS.rds")){
   NB <- esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/0') %>% 
     mutate(Lease_Identifier=MSNO) %>% 
     st_transform(proj)
-  # PEI <- esri2sf::esri2sf('https://www.arcgis.com/sharing/rest/content/items/16aa8830c7084a8a92ce066b525978b4')
-  
+
   raw <- jsonlite::read_json(
     "https://www.arcgis.com/sharing/rest/content/items/16aa8830c7084a8a92ce066b525978b4/data",
     simplifyVector = FALSE
@@ -93,6 +87,7 @@ source("functions.R")
 ui <- navbarPage(
   title = "Introductions and Transfers Tool",
   
+  
   tabPanel("Origin",
            sidebarLayout(
              
@@ -123,6 +118,7 @@ ui <- navbarPage(
              
            )
   ),
+  
   
   tabPanel("Destination",
            sidebarLayout(
@@ -155,6 +151,7 @@ ui <- navbarPage(
            )
   ),
   
+  
   tabPanel("Summary",
            checkboxGroupInput(
              inputId = "product",
@@ -164,9 +161,11 @@ ui <- navbarPage(
            tableOutput("species"),
            tableOutput("mitigation")),
   
+  
   tabPanel("Interactive Map",
            leafletOutput("leafletmap",height=800)
   ),
+  
   
   tabPanel("Settings",
            numericInput(inputId = "monitoringyear",
@@ -179,9 +178,13 @@ ui <- navbarPage(
   
 )
 
+
+
+
 #### Server Logic ####
 server <- function(input, output, session) {
   
+  # reactive functions that filter data
   monitoring_filtered <- reactive({
     # browser()
     monitoring %>% 
@@ -194,6 +197,7 @@ server <- function(input, output, session) {
                                    FALSE,
                                    any(Presence>0,na.rm = TRUE))) %>% 
       ungroup() %>% 
+      mutate(Species=gsub("_"," ",Species)) %>% 
       spread(key = "Species", value = "Presence") %>% 
       inner_join(monitoring_sites,by = "StnLocation")
   })
@@ -209,32 +213,20 @@ server <- function(input, output, session) {
       left_join(incidental_sites,by = "StnLocation")
   })
   
-  observeEvent(input$origprov, {
-    #get provincial leases
-    prov <- origprovInput()
-    
-    
-    # update lease options
-    updateSelectInput(session,
-                      "origlease",
-                      choices = prov$Lease_Identifier)
-  })
   
-  observeEvent(input$origlease, {
-    #get provincial leases
-    prov <- origprovInput()
-    # get correct lease
-    lease <- origprovInput() %>%
-      filter(Lease_Identifier==input$origlease)
-    
-    
-    #update selectable sites
+  
+  
+  
+  
+  # functions for updating UI
+  
+  update_orig_sites <- function(lease,prov){
     if(input$origmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
-                                       prov,
-                                       monitoring_filtered(),
-                                       as.numeric(input$origmonitoringnum),
-                                       monitoring_dist())
+                                        prov,
+                                        monitoring_filtered(),
+                                        as.numeric(input$origmonitoringnum),
+                                        monitoring_dist_orig())
       
       updateCheckboxGroupInput(session,
                                "origmonitoringsite",
@@ -244,32 +236,24 @@ server <- function(input, output, session) {
     
     if(input$origincidentalnum!=""){
       nearestincidental <- nearestsites(lease,
-                                       prov,
-                                       incidental_filtered(),
-                                       as.numeric(input$origincidentalnum),
-                                       gcdist())
+                                        prov,
+                                        incidental_filtered(),
+                                        as.numeric(input$origincidentalnum),
+                                        incidental_dist_orig())
       
       updateCheckboxGroupInput(session,
                                "origincidentalsite",
                                choices = nearestincidental$StnLocation)
     }
-  })
+  }
   
-  observeEvent(input$destlease, {
-    #get provincial leases
-    prov <- destprovInput()
-    # get correct lease
-    lease <- destprovInput() %>%
-      filter(Lease_Identifier==input$destlease)
-    
-    
-    #update selectable sites
+  update_dest_sites <- function(lease,prov){
     if(input$destmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
-                                       prov,
-                                       monitoring_filtered(),
-                                       as.numeric(input$destmonitoringnum),
-                                       monitoring_dist())
+                                        prov,
+                                        monitoring_filtered(),
+                                        as.numeric(input$destmonitoringnum),
+                                        monitoring_dist_dest())
       
       updateCheckboxGroupInput(session,
                                "destmonitoringsite",
@@ -279,20 +263,113 @@ server <- function(input, output, session) {
     
     if(input$destincidentalnum!=""){
       nearestincidental <- nearestsites(lease,
-                                       prov,
-                                       incidental_filtered(),
-                                       as.numeric(input$destincidentalnum),
-                                       gcdist())
+                                        prov,
+                                        incidental_filtered(),
+                                        as.numeric(input$destincidentalnum),
+                                        incidental_dist_dest())
       
       updateCheckboxGroupInput(session,
                                "destincidentalsite",
                                choices = nearestincidental$StnLocation)
     }
+  }
+  
+  
+  
+  
+  
+  
+  # Observe events to trigger updates
+  
+  # Origin - choose a province 
+  observeEvent(input$origprov, {
+    #get provincial leases
+    prov <- origprovInput()
+    
+    # update lease options
+    freezeReactiveValue(input,"map")
+    updateSelectInput(session,
+                      "origlease",
+                      choices = prov$Lease_Identifier,
+                      selected = prov$Lease_Identifier[1])
+    
+    # get correct lease
+    lease <- origprovInput() %>%
+      filter(Lease_Identifier==prov$Lease_Identifier[1])
+
+    update_orig_sites(lease,prov)
   })
+  
+  # Origin - Choose a lease
+  observeEvent(input$origlease, {
+     update_orig_sites(lease=origprovInput() %>%
+                        filter(Lease_Identifier==input$origlease),
+                      prov=origprovInput())
+  })
+  
+  # Origin - # of monitoring sites
+  observeEvent(input$origmonitoringnum, {
+    update_orig_sites(lease=origprovInput() %>%
+                        filter(Lease_Identifier==input$origlease),
+                      prov=origprovInput())
+  })
+  
+  # Origin - # of incidental sites
+  observeEvent(input$origincidentalnum, {
+    update_orig_sites(lease=origprovInput() %>%
+                        filter(Lease_Identifier==input$origlease),
+                      prov=origprovInput())
+  })
+  
+  # Destination - choose a province 
+  observeEvent(input$destprov, {
+    #get provincial leases
+    prov <- destprovInput()
+    
+    # update lease options
+    updateSelectInput(session,
+                      "destlease",
+                      choices = prov$Lease_Identifier,
+                      selected = prov$Lease_Identifier[1])
+    
+    # get correct lease
+    lease <- destprovInput() %>%
+      filter(Lease_Identifier==prov$Lease_Identifier[1])
+    
+    update_dest_sites(lease,prov)
+  })
+  
+  # Destination - Choose a lease
+  observeEvent(input$destlease, {
+    update_dest_sites(lease=destprovInput() %>%
+                        filter(Lease_Identifier==input$destlease),
+                      prov=destprovInput())
+  })
+  
+  # Destination - # of monitoring sites
+  observeEvent(input$destmonitoringnum, {
+    update_dest_sites(lease=destprovInput() %>%
+                        filter(Lease_Identifier==input$destlease),
+                      prov=destprovInput())
+  })
+  
+  # Destination - # of incidental sites
+  observeEvent(input$destincidentalnum, {
+    update_dest_sites(lease=destprovInput() %>%
+                        filter(Lease_Identifier==input$destlease),
+                      prov=destprovInput())
+  })
+  
+  
+  
+    
+ 
+  
+  
   
 
   
-  
+  # reactive switches that get the correct leases and distance matrices
   origprovInput <- reactive({
     switch(input$origprov,
            "NS" = NS,
@@ -307,22 +384,36 @@ server <- function(input, output, session) {
            "PEI" = PEI)
   })
   
-  monitoring_dist <- reactive({
+  monitoring_dist_orig <- reactive({
     switch(input$origprov,
            "NS" = ns_monitoring_dist,
            "NB" = nb_monitoring_dist,
            "PEI" = pei_monitoring_dist)
   })
   
-  gcdist <- reactive({
+  incidental_dist_orig <- reactive({
     switch(input$origprov,
            "NS" = ns_incidental_dist,
            "NB" = nb_incidental_dist,
            "PEI" = pei_incidental_dist)
   })
   
+  monitoring_dist_dest <- reactive({
+    switch(input$destprov,
+           "NS" = ns_monitoring_dist,
+           "NB" = nb_monitoring_dist,
+           "PEI" = pei_monitoring_dist)
+  })
+  
+  incidental_dist_dest <- reactive({
+    switch(input$destprov,
+           "NS" = ns_incidental_dist,
+           "NB" = nb_incidental_dist,
+           "PEI" = pei_incidental_dist)
+  })
   #### Leaflet maps ####
   
+  # full interactive map
   output$leafletmap <- renderLeaflet({
     basemap(leases=NS,
             incidentals=incidental_filtered(),
@@ -331,20 +422,27 @@ server <- function(input, output, session) {
   })
 
 
+  # map for origin tab
   output$leafletorig <- renderLeaflet({
-    # browser()
-    lease <- origprovInput() %>%
-      filter(Lease_Identifier==input$origlease)
-
+    print("making map")
+    
     prov <- origprovInput()
-
+    
+    if(!input$origlease %in% prov$Lease_Identifier){
+      lease <- prov %>%
+        filter(Lease_Identifier==prov$Lease_Identifier[1])
+    } else {
+      lease <- origprovInput() %>%
+        filter(Lease_Identifier==input$origlease)
+    }
+    
 
     if(input$origmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                        prov,
                                        monitoring_filtered(),
                                        as.numeric(input$origmonitoringnum),
-                                       ns_monitoring_dist)
+                                       monitoring_dist_orig())
     }
 
     if(input$origincidentalnum!=""){
@@ -352,7 +450,7 @@ server <- function(input, output, session) {
                                        prov,
                                        incidental_filtered(),
                                        as.numeric(input$origincidentalnum),
-                                       ns_incidental_dist)
+                                       incidental_dist_orig())
     }
 
     if(input$origincidentalnum!="" & input$origmonitoringnum!=""){
@@ -363,29 +461,36 @@ server <- function(input, output, session) {
     }
   })
 
+  # map for destination tab
   output$leafletdest <- renderLeaflet({
-    lease <- destprovInput() %>%
-      filter(Lease_Identifier==input$destlease)
 
     prov <- destprovInput()
-
-
+    
+    if(!input$destlease %in% prov$Lease_Identifier){
+      lease <- prov %>%
+        filter(Lease_Identifier==prov$Lease_Identifier[1])
+    } else {
+      lease <- destprovInput() %>%
+        filter(Lease_Identifier==input$destlease)
+    }
+    
+    
     if(input$destmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
-                                       prov,
-                                       monitoring_filtered(),
-                                       as.numeric(input$destmonitoringnum),
-                                       ns_monitoring_dist)
+                                        prov,
+                                        monitoring_filtered(),
+                                        as.numeric(input$destmonitoringnum),
+                                        monitoring_dist_dest())
     }
-
+    
     if(input$destincidentalnum!=""){
       nearestincidental <- nearestsites(lease,
-                                       prov,
-                                       incidental_filtered(),
-                                       as.numeric(input$destincidentalnum),
-                                       ns_incidental_dist)
+                                        prov,
+                                        incidental_filtered(),
+                                        as.numeric(input$destincidentalnum),
+                                        incidental_dist_dest())
     }
-
+    
     if(input$destincidentalnum!="" & input$destmonitoringnum!=""){
       basemap(leases=lease,
               incidentals=nearestincidental,
@@ -393,6 +498,7 @@ server <- function(input, output, session) {
               monitoringsp=AIS$Scientific_Name)
     }
   })
+  
   
   #### summary ####
   
@@ -422,7 +528,8 @@ server <- function(input, output, session) {
           filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>% 
           data.frame() %>% 
           gather(key="Species",value="Presence",-StnLocation) %>% 
-          filter(Species %in% monitoringsp) %>% 
+          mutate(Species=gsub("\\."," ",Species)) %>% 
+          filter(Species %in% AIS$Scientific_Name) %>% 
           group_by(Species) %>% 
           summarize(Presence = any(as.logical(Presence)))
       }else {
@@ -434,7 +541,8 @@ server <- function(input, output, session) {
           filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>% 
           data.frame() %>% 
           gather(key="Species",value="Presence",-StnLocation) %>% 
-          filter(Species %in% monitoringsp) %>% 
+          mutate(Species=gsub("\\."," ",Species)) %>% 
+          filter(Species %in% AIS$Scientific_Name) %>% 
           group_by(Species) %>% 
           summarize(Presence = any(as.logical(Presence)))
       } else {
