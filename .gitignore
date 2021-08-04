@@ -45,6 +45,7 @@ WDBII_shp/*
 COPYING.LESSERv3
 gshhg-shp-2.3.7.zip
 
-# input data for 'make_distance_matirx.R'(contains unpublished data from Science)
+# input data for 'make_distance_matrix.R'(contains unpublished data from Science)
 recentdata/*
-spatialdata/*
+spatialdata/GSHHS_shp/*
+spatialdata/WDBII*
