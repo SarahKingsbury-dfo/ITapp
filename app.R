@@ -79,7 +79,7 @@ greenCrabIcon <- makeIcon(
   iconHeight = 37
 )
 
-html_legend <- paste0("<img src='",getwd(),"/",greenCrabIcon$iconUrl,"'>  Green Crab")
+# html_legend <- paste0("<img src='",getwd(),"/",greenCrabIcon$iconUrl,"'>  Green Crab")
 
 source("functions.R")
 
@@ -103,7 +103,7 @@ ui <- navbarPage(
                          value = 3),
                numericInput(inputId = "origincidentalnum",
                          label = "Number of Incidental Observation Sites",
-                         value = 3),
+                         value = 5),
                checkboxGroupInput(inputId = "origmonitoringsite",
                                   label = "Biofouling Monitoring Sites to Include",
                                   choices = "temp"),
@@ -203,13 +203,21 @@ server <- function(input, output, session) {
   })
   
   incidental_filtered <- reactive({
+    # browser()
     incidental %>% 
       filter(Year>=input$incidentalyear) %>% 
       as.data.table() %>% 
       dplyr::select(-geometry) %>% 
       group_by(Species,StnLocation) %>% 
-      summarize(Presence = TRUE) %>% 
+      summarize(Presence = TRUE,
+                link=if_else(all(is.na(link)),
+                             "NA",
+                             paste0('<a href = "',unique(link),'"> ',Species,' </a>',collapse=" ")),
+                prov = paste(unique(prov))) %>% 
       ungroup() %>% 
+      mutate(link=if_else(link=="NA",
+                          prov,
+                          link)) %>% 
       left_join(incidental_sites,by = "StnLocation")
   })
   
