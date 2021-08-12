@@ -15,9 +15,11 @@ proj <- "+proj=longlat +datum=WGS84"
 if(!file.exists("spatialdata/NS.rds")){
   if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
   NS <- esri2sf::esri2sf('https://services.arcgis.com/nQHSMRVltyfsxeFe/ArcGIS/rest/services/Marine_Lease_Boundary_Database_Shellfish_View/FeatureServer/0') %>% 
-    filter(SiteStatus=="Issued") %>% 
+    filter(grepl("Issued",SiteStatus)|grepl("Propose",SiteStatus)|grepl("Approved Option",SiteStatus)) %>%
+    # filter(SiteStatus=="Issued") %>% 
     mutate(Lease_Identifier=License_Lease_Num) %>% 
     st_transform(proj)
+  
   NB <- esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/0') %>% 
     mutate(Lease_Identifier=MSNO) %>% 
     st_transform(proj)
