@@ -18,11 +18,13 @@ if(!file.exists("spatialdata/NS.rds")){
     filter(grepl("Issued",SiteStatus)|grepl("Propose",SiteStatus)|grepl("Approved Option",SiteStatus)) %>%
     # filter(SiteStatus=="Issued") %>% 
     mutate(Lease_Identifier=License_Lease_Num) %>% 
-    st_transform(proj)
+    st_transform(proj) %>% 
+    rename(geometry=geoms)
   
   NB <- esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/0') %>% 
     mutate(Lease_Identifier=MSNO) %>% 
-    st_transform(proj)
+    st_transform(proj) %>% 
+    rename(geometry=geoms)
 
   raw <- jsonlite::read_json(
     "https://www.arcgis.com/sharing/rest/content/items/16aa8830c7084a8a92ce066b525978b4/data",
@@ -425,7 +427,10 @@ server <- function(input, output, session) {
   
   # full interactive map
   output$leafletmap <- renderLeaflet({
-    basemap(leases=NS,
+    all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
+                        dplyr::select(NB,Lease_Identifier),
+                        dplyr::select(PEI,Lease_Identifier))
+    basemap(leases=all_leases,
             incidentals=incidental_filtered(),
             monitoring=monitoring_filtered(),
             monitoringsp=AIS$Scientific_Name)

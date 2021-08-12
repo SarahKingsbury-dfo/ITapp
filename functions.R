@@ -117,7 +117,7 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp){
   
   leaflet(leases) %>%
     addTiles() %>%
-    addPolygons() %>%
+    addPolygons(popup = paste("Lease:",leases$Lease_Identifier),group = "Leases") %>%
     addMarkers(data=incidentals$geometry,
                icon = IncidentalIcons[as.numeric(factor(incidentals$Species,levels=sort(monitoringsp)))],
                group = incidentals$Species,
@@ -127,7 +127,7 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp){
                   type="pie",
                   chartdata=as.data.frame(monitoring)[,sp]) %>%
     # addControl(html = html_legend, position = "bottomright") %>% 
-    addLayersControl(overlayGroups = c(incidentals$Species),
+    addLayersControl(overlayGroups = c("Leases",incidentals$Species),
                      options = layersControlOptions(collapsed = FALSE))
 }
 
