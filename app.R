@@ -580,8 +580,8 @@ server <- function(input, output, session) {
     summaryspecies <- summaryValues() 
     if(ncol(summaryspecies)>1){
       summaryspecies <- summaryspecies %>% 
-        mutate(Mitigation = if_else(`Presence (Origin)`,
-                                    if_else(`Presence (Destination)`,"Recommended","Required"),
+        mutate(`Risk Assessment` = if_else(`Presence (Origin)`,
+                                    if_else(`Presence (Destination)`,"Low risk with mitigation","High risk"),
                                     "")
                )
     }
