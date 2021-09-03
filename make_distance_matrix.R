@@ -30,7 +30,7 @@ species <- read.csv("commonnames.csv")
 
 # Load and clean up incidental data ---------------------------------------
 
-searcharea <- c(NS$geoms,NB$geoms,PEI$geometry) %>% 
+searcharea <- c(NS$geometry,NB$geometry,PEI$geometry) %>% 
   st_combine() %>% 
   st_convex_hull() %>% 
   st_transform(equidist) %>% 
@@ -54,7 +54,7 @@ incidental_occ <- occ(query=species$Scientific_Name,
                            name %in% c("BOLD:AAA7687","BOLD:ACL8382","Carcinus maenas (Linnaeus, 1758)") ~ "Carcinus maenas",
                            name %in% c("Botrylloides violaceus Oka, 1927") ~ "Botrylloides violaceus",
                            name %in% c("Botryllus schlosseri (Pallas, 1766)") ~ "Botryllus schlosseri",
-                           name %in% c("Caprella mutica Schurin, 1935") ~ "Caprella mutica",
+                           name %in% c("Caprella mutica Schurin, 1935","BOLD:AAE7686") ~ "Caprella mutica",
                            name %in% c("Ciona intestinalis (Linnaeus, 1767)","Ciona intestinalis tenella (Stimpson, 1852)","Ciona tenella (Stimpson, 1852)") ~ "Ciona intestinalis",
                            name %in% c("Codium fragile (Suringar) Hariot","Codium fragile subsp. fragile","Codium fragile subsp. tomentosoides (Goor) P.C.Silva","Codium fragile tomentosoides") ~ "Codium fragile",
                            name %in% c("Didemnum vexillum Kott, 2002") ~ "Didemnum vexillum",
@@ -255,7 +255,7 @@ saveRDS(tr,"outputdata/transition.rds")
 #### NS vs  incidentals and monitoring ####
 
 print("Calculating in water distances for NS")
-ns_incidental_dist <- do.call(rbind,(lapply(NS$geoms %>%
+ns_incidental_dist <- do.call(rbind,(lapply(NS$geometry %>%
                                               st_transform(equidist),
                                             function(x) inwaterdistance(incidental_sites %>%
                                                                           st_transform(equidist),
@@ -266,7 +266,7 @@ colnames(ns_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(ns_incidental_dist,"outputdata/ns_incidental_dist.rds")
 
 
-ns_monitoring_dist <- do.call(rbind,(lapply(NS$geoms %>%
+ns_monitoring_dist <- do.call(rbind,(lapply(NS$geometry %>%
                                               st_transform(equidist),
                                             function(x) inwaterdistance(monitoring_sites %>%
                                                                           st_transform(equidist),
@@ -279,7 +279,7 @@ saveRDS(ns_monitoring_dist,"outputdata/ns_monitoring_dist.rds")
 #### NB vs  incidentals and monitoring ####
 
 print("Calculating in water distances for NB")
-nb_incidental_dist <- do.call(rbind,(lapply(NB$geoms %>%
+nb_incidental_dist <- do.call(rbind,(lapply(NB$geometry %>%
                                               st_transform(equidist),
                                             function(x) inwaterdistance(incidental_sites %>%
                                                                           st_transform(equidist),
@@ -290,7 +290,7 @@ colnames(nb_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(nb_incidental_dist,"outputdata/nb_incidental_dist.rds")
 
 
-nb_monitoring_dist <- do.call(rbind,(lapply(NB$geoms %>%
+nb_monitoring_dist <- do.call(rbind,(lapply(NB$geometry %>%
                                               st_transform(equidist),
                                             function(x) inwaterdistance(monitoring_sites %>%
                                                                           st_transform(equidist),

@@ -21,8 +21,9 @@ if(!file.exists("spatialdata/NS.rds")){
     st_transform(proj) %>% 
     rename(geometry=geoms)
   
-  NB <- esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/0') %>% 
-    mutate(Lease_Identifier=MSNO) %>% 
+  NB <- bind_rows(esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/0') %>% rename(Lease_Identifier = MSNO),
+                  esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/1') %>% rename(Lease_Identifier = LPNO),
+                  esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/2') %>% rename(Lease_Identifier = MSNO)) %>% 
     st_transform(proj) %>% 
     rename(geometry=geoms)
 
