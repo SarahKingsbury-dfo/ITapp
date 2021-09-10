@@ -163,6 +163,8 @@ ui <- navbarPage(
              label = "Applicable Product Description(s):",
              choices = unique(mitigations$Product_treated)
            ),
+           textAreaInput("response","Suggested Response (Experimental)","test1",width = "100%",resize = "vertical"),
+           h3("Supportive Tables"),
            tableOutput("species"),
            tableOutput("mitigation")),
   
@@ -526,17 +528,17 @@ server <- function(input, output, session) {
        is.null(input$destmonitoringsite)&
        is.null(input$destincidentalsite)){
       summary <- data.frame(
-        Site = "No Origin or Destination sites selected"
+        Site = "No biofouling monitoring sites or incidental observation sites were selected on the Origin or Destination tab"
       )
     } else if(is.null(input$origmonitoringsite)&
               is.null(input$origincidentalsite)){
       summary <- data.frame(
-        Site = "No Origin  sites selected"
+        Site = "No biofouling monitoring sites or incidental observation sites were selected on the Origin tab"
       )
     }else if(is.null(input$destmonitoringsite)&
              is.null(input$destincidentalsite)){
       summary <- data.frame(
-        Site = "No Destination sites selected"
+        Site = "No biofouling monitoring sites or incidental observation sites were selected on the Destination tab"
       )
     } else {
       if(!is.null(input$origmonitoringsite)){
@@ -569,12 +571,12 @@ server <- function(input, output, session) {
         origin <- origin %>%
           bind_rows(data.frame("Species"="Carcinus_maenas","Presence"=TRUE))
       }
-
+      
       if(!is.null(input$destincidentalsite)){
         destination <- destination %>%
           bind_rows(data.frame("Species"="Carcinus_maenas","Presence"=TRUE))
       }
-
+      
       summary <- full_join(origin,destination,by="Species",suffix=c(" (Origin)"," (Destination)")) %>% 
         replace_na(list(Species=NA,"Presence (Origin)"=FALSE,"Presence (Destination)"=FALSE)) %>% 
         mutate(Species = str_replace(Species,"_"," "))
@@ -598,31 +600,32 @@ server <- function(input, output, session) {
     summarymitigation <- summaryValues()
     if(ncol(summarymitigation)>1){
       if(length(input$product)>0){
-        summarymitigation <- summarymitigation %>%
-          mutate(Mitigation = if_else(`Presence (Origin)`,
-                                      if_else(`Presence (Destination)`,"Recommended","Required"),
-                                      "")) %>%
-          filter(Mitigation!="") %>%
+        summarymitigation <- summarymitigation %>% 
+          mutate(`Risk Assessment` = if_else(`Presence (Origin)`,
+                                             if_else(`Presence (Destination)`,"Low risk with mitigation","High risk"),
+                                             "")) %>%
+          filter(`Risk Assessment`!="") %>%
           left_join(mitigations,by=c("Species"="Scientific_Name")) %>% 
-          dplyr::select(Species, Common_Name, Product_treated, Treatment_proposed) %>% 
+          dplyr::select(Species, Common_Name, Product_treated,`Risk Assessment`,Treatment_proposed) %>% 
           filter(Product_treated %in% input$product)
       } else {
         summarymitigation <- data.frame(
-          Mitigation = "At least one product type must be selected"
+          Site = "At least one applicable product description must be selected"
         )
       }
     }
     
     if(nrow(summarymitigation)==0){
-      data.frame(
-        Mitigation = "No mitigation measures exist for this combination of species and product"
+      summarymitigation <- data.frame(
+        Site = "No mitigation measures exist for this combination of species and product"
       )
-    } else {
-      summarymitigation
     }
     
+    updateTextInput(inputId = "response",value = create_response(dfsummary = summarymitigation))
+    return(summarymitigation %>% 
+             setNames(gsub("_"," ",names(.))))
+    
   })
-  
   
 }
 
