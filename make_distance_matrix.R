@@ -157,7 +157,8 @@ maritimes_tunicate_new <- read.csv("recentdata/AIS_2020_present_absent.csv")%>%
   st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>% 
   dplyr::rename(Didemnum_vexillum=Didemnum_Vexillum)%>% 
   st_transform(proj)%>% 
-  dplyr::select(-Region,-StnNum)
+  dplyr::select(-Region,-StnNum) %>% 
+  mutate(Year=2020)
 
 
 # Gulf Tunicates
