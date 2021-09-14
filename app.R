@@ -58,7 +58,7 @@ PEI <- readRDS("spatialdata/PEI.rds")
 
 AIS <- read.csv("commonnames.csv")
 
-mitigations <- read.csv("mitigation.csv",stringsAsFactors = FALSE)%>% 
+mitigations <- read.csv("treatment.csv",stringsAsFactors = FALSE)%>% 
   complete(Scientific_Name,Product_treated) %>% 
   left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "Scientific_Name")
 
