@@ -58,9 +58,14 @@ PEI <- readRDS("spatialdata/PEI.rds")
 
 AIS <- read.csv("commonnames.csv")
 
-mitigations <- read.csv("treatment.csv",stringsAsFactors = FALSE)%>% 
+sp_treatments <- read.csv("treatment.csv",stringsAsFactors = FALSE)%>% 
   complete(Scientific_Name,Product_treated) %>% 
   left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "Scientific_Name")
+
+sp_mitigation <- read.csv("mitigation.csv",stringsAsFactors = FALSE)
+
+product_sp <- as.list(c(unique(sp_treatments$Product_treated),
+                        unique(sp_mitigation$Common_Name)))
 
 if(!file.exists("outputdata/pei_monitoring_dist.rds")){
   source("make_distance_matrix.R")
@@ -157,16 +162,30 @@ ui <- navbarPage(
   ),
   
   
+  
   tabPanel("Summary",
-           checkboxGroupInput(
-             inputId = "product",
-             label = "Applicable Product Description(s):",
-             choices = unique(mitigations$Product_treated)
+           fluidRow(
+             column(4,
+                    radioButtons(
+                      inputId = "product",
+                      label = "Applicable Product Description(s):",
+                      choices = product_sp,
+                      selected = character(0)
+                      )),
+             column(4,
+                    checkboxGroupInput(
+                      inputId = "consideration",
+                      label = "Other Considerations",
+                      choices = c("Land-based origin",
+                                  "Land-based destination")
+                    )
+             )
            ),
-           textAreaInput("response","Suggested Response (Experimental)","test1",width = "100%",resize = "vertical"),
+           textAreaInput("response","Suggested Response (Experimental)","No suggested response generated (yet)",width = "100%",resize = "vertical"),
            h3("Supportive Tables"),
            tableOutput("species"),
-           tableOutput("mitigation")),
+           tableOutput("mitigation")
+  ),
   
   
   tabPanel("Interactive Map",
@@ -245,7 +264,8 @@ server <- function(input, output, session) {
       
       updateCheckboxGroupInput(session,
                                "origmonitoringsite",
-                               choices = nearestmonitoring$StnLocation)
+                               choices = nearestmonitoring$StnLocation,
+                               selected = nearestmonitoring$StnLocation[1])
       
     }
     
@@ -272,7 +292,8 @@ server <- function(input, output, session) {
       
       updateCheckboxGroupInput(session,
                                "destmonitoringsite",
-                               choices = nearestmonitoring$StnLocation)
+                               choices = nearestmonitoring$StnLocation,
+                               selected = nearestmonitoring$StnLocation[1])
       
     }
     
@@ -598,6 +619,7 @@ server <- function(input, output, session) {
   
   output$mitigation <- renderTable({
     summarymitigation <- summaryValues()
+    # browser()
     if(ncol(summarymitigation)>1){
       if(length(input$product)>0){
         summarymitigation <- summarymitigation %>% 
@@ -605,23 +627,52 @@ server <- function(input, output, session) {
                                              if_else(`Presence (Destination)`,"Low risk with mitigation","High risk"),
                                              "")) %>%
           filter(`Risk Assessment`!="") %>%
-          left_join(mitigations,by=c("Species"="Scientific_Name")) %>% 
+          left_join(sp_treatments,by=c("Species"="Scientific_Name")) %>% 
           dplyr::select(Species, Common_Name, Product_treated,`Risk Assessment`,Treatment_proposed) %>% 
           filter(Product_treated %in% input$product)
       } else {
         summarymitigation <- data.frame(
-          Site = "At least one applicable product description must be selected"
+          Site = "An applicable product description must be selected"
         )
       }
     }
     
     if(nrow(summarymitigation)==0){
-      summarymitigation <- data.frame(
-        Site = "No mitigation measures exist for this combination of species and product"
-      )
+      if(input$product %in% sp_mitigation$Common_Name){
+        summarymitigation <- data.frame(
+          Site = sp_mitigation %>% 
+            filter(Common_Name==input$product) %>% 
+            select(Mitigation) %>% 
+            as.character()
+        )
+      } else{
+        summarymitigation <- data.frame(
+          Site = "No mitigation treatments exist for this combination of species and product"
+        )
+      }
+      
     }
     
-    updateTextInput(inputId = "response",value = create_response(dfsummary = summarymitigation))
+    if(!is.null(input$consideration)){
+      if(all(input$consideration==c("Land-based origin","Land-based destination"))){
+        summarymitigation <- data.frame(
+          Site = "The risk for AIS/FFHPP/SARP is considered low with high certainty because the origin and destination sites are land-based")
+      } else if(input$consideration=="Land-based origin"){
+        if(!input$product %in% sp_mitigation$Common_Name){
+          summarymitigation <- data.frame(
+            Site = "The risk for AIS/FFHPP/SARP is considered low with high certainty because the origin site is land-based")
+        }
+        
+      } else if(input$consideration=="Land-based destination"){
+        summarymitigation <- data.frame(
+          Site = "The risk for AIS/FFHPP/SARP is considered low with high certainty because the destination site is land-based")
+      } else {
+        summarymitigation <- data.frame(
+          Site = "This (combination of) consideration(s) is not resolved in this app")
+      }
+    }
+    
+    updateTextInput(inputId = "response",value = create_response(summitigation = summarymitigation, species = input$product))
     return(summarymitigation %>% 
              setNames(gsub("_"," ",names(.))))
     
