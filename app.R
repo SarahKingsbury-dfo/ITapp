@@ -544,6 +544,7 @@ server <- function(input, output, session) {
   summaryValues <- reactive({
     print("Generating Summary")
     # browser()
+    # prevent summary/suggested responses if inadequate sites selected
     if(is.null(input$origmonitoringsite)&
        is.null(input$origincidentalsite)&
        is.null(input$destmonitoringsite)&
@@ -562,6 +563,7 @@ server <- function(input, output, session) {
         Site = "No biofouling monitoring sites or incidental observation sites were selected on the Destination tab"
       )
     } else {
+      # get monitoring data for origin
       if(!is.null(input$origmonitoringsite)){
         origin <- monitoring_filtered() %>% 
           filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>% 
@@ -575,6 +577,7 @@ server <- function(input, output, session) {
         origin <- data.frame("Species"=character(0),"Presence"=logical(0))
       }
       
+      # get monitoring data for destination
       if(!is.null(input$destmonitoringsite)){  
         destination <- monitoring_filtered() %>% 
           filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>% 
@@ -588,14 +591,35 @@ server <- function(input, output, session) {
         destination <- data.frame("Species"=character(0),"Presence"=logical(0))
       }
       
+      
+      # get incidental data for origin
       if(!is.null(input$origincidentalsite)){
         origin <- origin %>%
-          bind_rows(data.frame("Species"="Carcinus_maenas","Presence"=TRUE))
+          bind_rows(incidental_filtered() %>% 
+                      filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$origincidentalsite)) %>% 
+                      data.frame() %>% 
+                      mutate(Species=gsub("\\."," ",Species)) %>% 
+                      filter(Species %in% AIS$Scientific_Name) %>% 
+                      group_by(Species) %>% 
+                      summarize(Presence = any(as.logical(Presence)))) %>% 
+          group_by(Species) %>% 
+          summarize(Presence = any(as.logical(Presence)))
+        
       }
       
+      
+      # get incidental data for destination
       if(!is.null(input$destincidentalsite)){
         destination <- destination %>%
-          bind_rows(data.frame("Species"="Carcinus_maenas","Presence"=TRUE))
+          bind_rows(incidental_filtered() %>% 
+                      filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$destincidentalsite)) %>% 
+                      data.frame() %>% 
+                      mutate(Species=gsub("\\."," ",Species)) %>% 
+                      filter(Species %in% AIS$Scientific_Name) %>% 
+                      group_by(Species) %>% 
+                      summarize(Presence = any(as.logical(Presence)))) %>% 
+          group_by(Species) %>% 
+          summarize(Presence = any(as.logical(Presence)))
       }
       
       summary <- full_join(origin,destination,by="Species",suffix=c(" (Origin)"," (Destination)")) %>% 
