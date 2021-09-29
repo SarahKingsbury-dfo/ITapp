@@ -1,4 +1,3 @@
-if(!require("devtools")) install.packages("devtools")
 if(!require("shiny")) install.packages("shiny")
 if(!require("sf")) install.packages("sf")
 if(!require("leaflet")) install.packages("leaflet")
@@ -13,6 +12,7 @@ proj <- "+proj=longlat +datum=WGS84"
 
 ### download provincial lease data or just open the saved version
 if(!file.exists("spatialdata/NS.rds")){
+  if(!require("devtools")) install.packages("devtools")
   if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
   NS <- esri2sf::esri2sf('https://services.arcgis.com/nQHSMRVltyfsxeFe/ArcGIS/rest/services/Marine_Lease_Boundary_Database_Shellfish_View/FeatureServer/0') %>% 
     filter(grepl("Issued",SiteStatus)|grepl("Propose",SiteStatus)|grepl("Approved Option",SiteStatus)) %>%
@@ -184,7 +184,8 @@ ui <- navbarPage(
            textAreaInput("response","Suggested Response (Experimental)","No suggested response generated (yet)",width = "100%",resize = "vertical"),
            h3("Supportive Tables"),
            tableOutput("species"),
-           tableOutput("mitigation")
+           tableOutput("mitigation"),
+           tableOutput("history")
   ),
   
   
@@ -195,11 +196,14 @@ ui <- navbarPage(
   
   tabPanel("Settings",
            numericInput(inputId = "monitoringyear",
-                        label = "Ignore Biofouling Monitoring Records Older Than:",
-                        value = 2013),
+                        label = "Ignore biofouling monitoring records older than:",
+                        value = 1900),
+           numericInput(inputId = "monitoringstrikes",
+                        label = "Number of non-detection records required to reverse a detection (i.e. when is an AIS considered 'failed to establish'):",
+                        value = 3),
            numericInput(inputId = "incidentalyear",
-                        label = "Ignore Incidental Observation Records Older Than:",
-                        value = 2013) 
+                        label = "Ignore incidental observation records older than:",
+                        value = 1900) 
   )
   
 )
@@ -212,21 +216,35 @@ server <- function(input, output, session) {
   
   # reactive functions that filter data
   monitoring_filtered <- reactive({
-    # browser()
     monitoring %>% 
       filter(Year>=input$monitoringyear) %>% 
       as.data.table() %>% 
       dplyr::select(-geometry) %>% 
       gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
       group_by(Species,StnLocation) %>% 
-      summarize(Presence = if_else(all(is.na(Presence)),
+      summarize(
+        History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
+                          length(Year)>input$monitoringstrikes&all(!tail(Presence,input$monitoringstrikes)) ~ paste0("Likely failed to establish, detected in: ",
+                                                                                                                     paste(Year[Presence],collapse = ", "),
+                                                                                                                     ", and not detected in: ",
+                                                                                                                     paste(Year[!Presence],collapse = ", ")),
+                          any(!Presence)~paste0("Detected in: ",
+                                                paste(Year[Presence],collapse = ", "),
+                                                ", and not detected in: ",
+                                                paste(Year[!Presence],collapse = ", ")),
+                          TRUE~paste("Detected in",paste(Year,collapse = ","))),
+        Presence = if_else(all(is.na(Presence)),
                                    FALSE,
-                                   any(Presence>0,na.rm = TRUE))) %>% 
+                                   any(Presence>0,na.rm = TRUE))
+        ) %>% 
       ungroup() %>% 
-      mutate(Species=gsub("_"," ",Species)) %>% 
-      spread(key = "Species", value = "Presence") %>% 
+      mutate(Species=gsub("_"," ",Species),
+             Presence=as.character(Presence)) %>% 
+      pivot_longer(cols = c(Presence,History)) %>% 
+      pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
       inner_join(monitoring_sites,by = "StnLocation")
   })
+  
   
   incidental_filtered <- reactive({
     # browser()
@@ -246,8 +264,7 @@ server <- function(input, output, session) {
                           link)) %>% 
       left_join(incidental_sites,by = "StnLocation")
   })
-  
-  
+
   
   
   
@@ -258,7 +275,7 @@ server <- function(input, output, session) {
     if(input$origmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                         prov,
-                                        monitoring_filtered(),
+                                        monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
                                         as.numeric(input$origmonitoringnum),
                                         monitoring_dist_orig())
       
@@ -286,7 +303,7 @@ server <- function(input, output, session) {
     if(input$destmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                         prov,
-                                        monitoring_filtered(),
+                                        monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
                                         as.numeric(input$destmonitoringnum),
                                         monitoring_dist_dest())
       
@@ -456,13 +473,14 @@ server <- function(input, output, session) {
                         dplyr::select(PEI,Lease_Identifier))
     basemap(leases=all_leases,
             incidentals=incidental_filtered(),
-            monitoring=monitoring_filtered(),
+            monitoring=monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
             monitoringsp=AIS$Scientific_Name)
   })
 
 
   # map for origin tab
   output$leafletorig <- renderLeaflet({
+    # browser()
     print("making map")
     
     prov <- origprovInput()
@@ -479,7 +497,7 @@ server <- function(input, output, session) {
     if(input$origmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                        prov,
-                                       monitoring_filtered(),
+                                       monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% mutate(across(2:(ncol(.)-1),as.logical)),
                                        as.numeric(input$origmonitoringnum),
                                        monitoring_dist_orig())
     }
@@ -517,7 +535,7 @@ server <- function(input, output, session) {
     if(input$destmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                         prov,
-                                        monitoring_filtered(),
+                                        monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
                                         as.numeric(input$destmonitoringnum),
                                         monitoring_dist_dest())
     }
@@ -544,6 +562,7 @@ server <- function(input, output, session) {
   summaryValues <- reactive({
     print("Generating Summary")
     # browser()
+    
     # prevent summary/suggested responses if inadequate sites selected
     if(is.null(input$origmonitoringsite)&
        is.null(input$origincidentalsite)&
@@ -565,7 +584,7 @@ server <- function(input, output, session) {
     } else {
       # get monitoring data for origin
       if(!is.null(input$origmonitoringsite)){
-        origin <- monitoring_filtered() %>% 
+        origin <- monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
           filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>% 
           data.frame() %>% 
           gather(key="Species",value="Presence",-StnLocation) %>% 
@@ -579,7 +598,7 @@ server <- function(input, output, session) {
       
       # get monitoring data for destination
       if(!is.null(input$destmonitoringsite)){  
-        destination <- monitoring_filtered() %>% 
+        destination <- monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
           filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>% 
           data.frame() %>% 
           gather(key="Species",value="Presence",-StnLocation) %>% 
@@ -626,6 +645,7 @@ server <- function(input, output, session) {
         replace_na(list(Species=NA,"Presence (Origin)"=FALSE,"Presence (Destination)"=FALSE)) %>% 
         mutate(Species = str_replace(Species,"_"," "))
     }
+
     summary
   })
   
@@ -700,6 +720,25 @@ server <- function(input, output, session) {
     return(summarymitigation %>% 
              setNames(gsub("_"," ",names(.))))
     
+  })
+  
+  output$history <- renderTable({
+    # browser()
+    origin <- monitoring_filtered() %>%
+      filter(name=="History"&gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>%
+      data.frame() %>%
+      select(-StnLocation) %>% 
+      gather(key="Species",value="History") %>%
+      mutate(Species=gsub("\\."," ",Species)) %>%
+      filter(Species %in% AIS$Scientific_Name)
+    destination <- monitoring_filtered() %>%
+      filter(name=="History"&gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>%
+      data.frame()%>%
+      select(-StnLocation) %>% 
+      gather(key="Species",value="History") %>%
+      mutate(Species=gsub("\\."," ",Species)) %>%
+      filter(Species %in% AIS$Scientific_Name)
+    full_join(origin,destination,by="Species", suffix=c(" (Origin)"," (Destination)"))
   })
   
 }
