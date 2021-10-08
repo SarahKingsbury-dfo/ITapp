@@ -1,6 +1,5 @@
 if(!require("spocc")) install.packages("spocc")
 if(!require("robis")) install.packages("robis")
-if(!require("robis")) install.packages("robis")
 if(!require("devtools")) install.packages("devtools")
 if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
 if(!require("sf")) install.packages("sf")
@@ -50,7 +49,8 @@ incidental_occ <- occ(query=species$Scientific_Name,
   mutate(link=case_when(prov=="gbif" ~ paste0("https://www.gbif.org/occurrence/",key),
                         prov=="inat" ~ paste0("https://www.inaturalist.org/observations/",key)
   )) %>% 
-  mutate(Species=case_when(name %in% c("Ascidiella aspersa (Müller, 1776)") ~ "Ascidiella aspersa",
+  mutate(Species=case_when(name %in% c("Aequipecten irradians (Lamarck, 1819)","Argopecten irradians (Lamarck, 1819)") ~ "Argopecten irradians",
+                           name %in% c("Ascidiella aspersa (Müller, 1776)") ~ "Ascidiella aspersa",
                            name %in% c("BOLD:AAA7687","BOLD:ACL8382","Carcinus maenas (Linnaeus, 1758)") ~ "Carcinus maenas",
                            name %in% c("Botrylloides violaceus Oka, 1927") ~ "Botrylloides violaceus",
                            name %in% c("Botryllus schlosseri (Pallas, 1766)") ~ "Botryllus schlosseri",
@@ -58,8 +58,10 @@ incidental_occ <- occ(query=species$Scientific_Name,
                            name %in% c("Ciona intestinalis (Linnaeus, 1767)","Ciona intestinalis tenella (Stimpson, 1852)","Ciona tenella (Stimpson, 1852)") ~ "Ciona intestinalis",
                            name %in% c("Codium fragile (Suringar) Hariot","Codium fragile subsp. fragile","Codium fragile subsp. tomentosoides (Goor) P.C.Silva","Codium fragile tomentosoides") ~ "Codium fragile",
                            name %in% c("Didemnum vexillum Kott, 2002") ~ "Didemnum vexillum",
-                           name %in% c("Hemigrapsus sanguineus (De Haan, 1835)") ~ "Hemigrapsus sanguineus",
+                           name %in% c("Hemigrapsus sanguineus (De Haan, 1835)","Hemigrapsus sanguineus (de Haan, 1835)") ~ "Hemigrapsus sanguineus",
                            name %in% c("Membranipora membranacea (Linnaeus, 1767)") ~ "Membranipora membranacea",
+                           name %in% c("Oncorhynchus mykiss (Walbaum, 1792)") ~ "Oncorhynchus mykiss",
+                           name %in% c("Ostrea edulis (Linnaeus, 1767)","Ostrea edulis Linnaeus, 1758") ~ "Ostrea edulis",
                            name %in% c("Styela clava Herdman, 1881") ~ "Styela clava",
                            TRUE ~ name),
          Year=as.numeric(substr(date,1,4)))
