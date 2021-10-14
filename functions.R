@@ -148,17 +148,15 @@ create_response <- function(summitigation,species){
   if("Site" %in% names(summitigation)){
     summitigation$Site
   } else if("Risk Assessment" %in% names(summitigation)){
-    # browser()
     mitigation <- read.csv("mitigation.csv")
     if("High risk" %in% summitigation$`Risk Assessment`){
       paste0("The risk to AIS/FFHPP/SARP is high with medium certainty because there are aquatic invasive species (",
-             paste(unique(summitigation$Common_Name),collapse = ", "),
+             paste(unique(summitigation$Common_Name[summitigation$`Risk Assessment`=="High risk"]),collapse = ", "),
              ") present at the origin site that are not found at the destination site")
     }else {
-      # browser()
       paste0("The risk to AIS/FFHPP/SARP is considered low with high certainty, with mitigation, because all aquatic invasive species (",
              paste(unique(summitigation$Common_Name),collapse = ", "),
-             ") present at the origin site are also present at the destination site. To reduce the risk of further spreading aquatic invasive species, the following mittigation treatment(s) are recommended: ",
+             ") present at the origin site are also present at the destination site. To reduce the risk of further spreading aquatic invasive species, the following mitigation treatment(s) are recommended: ",
              tolower(paste(unique(summitigation$Treatment_proposed),collapse = "; as well as, ")))
     }
   } else {

@@ -673,7 +673,15 @@ server <- function(input, output, session) {
           filter(`Risk Assessment`!="") %>%
           left_join(sp_treatments,by=c("Species"="Scientific_Name")) %>% 
           dplyr::select(Species, Common_Name, Product_treated,`Risk Assessment`,Treatment_proposed) %>% 
-          filter(Product_treated %in% input$product)
+          filter(Product_treated %in% input$product|is.na(Product_treated))
+        
+        # get common names from AIS if not available in sp_treatments
+        if(any(is.na(summarymitigation$Common_Name))){
+          summarymitigation <- summarymitigation %>% 
+            select(-Common_Name) %>% 
+            left_join(AIS,by=c("Species"="Scientific_Name"))
+        }
+        
       } else {
         summarymitigation <- data.frame(
           Site = "An applicable product description must be selected"
