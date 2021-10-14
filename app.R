@@ -204,7 +204,10 @@ ui <- navbarPage(
            numericInput(inputId = "incidentalyear",
                         label = "Ignore incidental observation records older than:",
                         value = 1900) 
-  )
+  ),
+  
+  tabPanel("Read Me",
+           includeMarkdown("README.md"))
   
 )
 
@@ -659,7 +662,9 @@ server <- function(input, output, session) {
                )
     }
     summaryspecies
-  })
+  },
+  caption.placement="top",
+  caption="Table 1: Species detections and consequential risk assessment due to presence/absence")
   
   output$mitigation <- renderTable({
     summarymitigation <- summaryValues()
@@ -728,7 +733,9 @@ server <- function(input, output, session) {
     return(summarymitigation %>% 
              setNames(gsub("_"," ",names(.))))
     
-  })
+  },
+  caption.placement="top",
+  caption="Table 2: Applicable 'fellow-traveller' mitigation strategies")
   
   output$history <- renderTable({
     # browser()
@@ -747,7 +754,9 @@ server <- function(input, output, session) {
       mutate(Species=gsub("\\."," ",Species)) %>%
       filter(Species %in% AIS$Scientific_Name)
     full_join(origin,destination,by="Species", suffix=c(" (Origin)"," (Destination)"))
-  })
+  },
+  caption.placement="top",
+  caption="Table 3: Invasion history")
   
 }
 

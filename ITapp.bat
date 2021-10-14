@@ -1,1 +1,1 @@
-R -e "shiny::runApp(launch.browser=TRUE)"
+"C:\Program Files\R\R-4.1.1\bin\R.exe" -e "shiny::runApp(launch.browser=TRUE)"
