@@ -53,6 +53,10 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp){
   # browser()
 
   IncidentalIcons <- iconList(
+    "Argopecten irradians" = makeIcon(
+      iconUrl = "blackCrab.png",
+      iconWidth = 50,
+      iconHeight = 37),
     "Ascidiella aspersa" = makeIcon(
       iconUrl = "blackCrab.png",
       iconWidth = 50,
@@ -94,6 +98,14 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp){
       iconWidth = 50,
       iconHeight = 37),
     "Membranipora membranacea" = makeIcon(
+      iconUrl = "blackCrab.png",
+      iconWidth = 50,
+      iconHeight = 37),
+    "Oncorhynchus mykiss" = makeIcon(
+      iconUrl = "blackCrab.png",
+      iconWidth = 50,
+      iconHeight = 37),
+    "Ostrea edulis" = makeIcon(
       iconUrl = "blackCrab.png",
       iconWidth = 50,
       iconHeight = 37),
