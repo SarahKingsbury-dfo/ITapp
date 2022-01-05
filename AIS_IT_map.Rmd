@@ -1,0 +1,146 @@
+---
+title: "I&T Interactive Map (Internal Use Only)"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup,warning=FALSE,message=FALSE,echo=FALSE}
+if(!require("shiny")) install.packages("shiny")
+if(!require("sf")) install.packages("sf")
+if(!require("leaflet")) install.packages("leaflet")
+if(!require("leaflet.minicharts")) install.packages("leaflet.minicharts")
+if(!require("data.table")) install.packages("data.table")
+if(!require("tidyverse")) install.packages("tidyverse")
+
+#### global variables ####
+
+proj <- "+proj=longlat +datum=WGS84"
+
+
+### download provincial lease data or just open the saved version
+if(!file.exists("spatialdata/NS.rds")){
+  if(!require("devtools")) install.packages("devtools")
+  if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
+  NS <- esri2sf::esri2sf('https://services.arcgis.com/nQHSMRVltyfsxeFe/ArcGIS/rest/services/Marine_Lease_Boundary_Database_Shellfish_View/FeatureServer/0') %>% 
+    filter(grepl("Issued",SiteStatus)|grepl("Propose",SiteStatus)|grepl("Approved Option",SiteStatus)) %>%
+    # filter(SiteStatus=="Issued") %>% 
+    mutate(Lease_Identifier=License_Lease_Num) %>% 
+    st_transform(proj) %>% 
+    rename(geometry=geoms)
+  
+  NB <- bind_rows(esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/0') %>% rename(Lease_Identifier = MSNO),
+                  esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/1') %>% rename(Lease_Identifier = LPNO),
+                  esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/2') %>% rename(Lease_Identifier = MSNO)) %>% 
+    st_transform(proj) %>% 
+    rename(geometry=geoms)
+
+  raw <- jsonlite::read_json(
+    "https://www.arcgis.com/sharing/rest/content/items/16aa8830c7084a8a92ce066b525978b4/data",
+    simplifyVector = FALSE
+  )
+  
+  features <- c(raw$operationalLayers[[1]]$featureCollection$layers[[1]]$featureSet$features,
+                raw$operationalLayers[[2]]$featureCollection$layers[[1]]$featureSet$features,
+                raw$operationalLayers[[3]]$featureCollection$layers[[1]]$featureSet$features)
+  
+  PEI <- lapply(features, "[[", "attributes") %>% 
+    lapply(as_tibble) %>% 
+    bind_rows() %>% 
+    mutate(geometry = esri2sf:::esri2sfPolygon(features)) %>% 
+    st_as_sf() %>% 
+    st_set_crs(features[[1]]$geometry$spatialReference$latestWkid)%>% 
+    mutate(Lease_Identifier=Lease) %>% 
+    st_transform(proj)
+  
+  saveRDS(NS,"spatialdata/NS.rds")
+  saveRDS(NB,"spatialdata/NB.rds")
+  saveRDS(PEI,"spatialdata/PEI.rds")
+  
+  
+}
+NS <- readRDS("spatialdata/NS.rds")
+NB <- readRDS("spatialdata/NB.rds")
+PEI <- readRDS("spatialdata/PEI.rds")
+
+
+AIS <- read.csv("commonnames.csv")
+
+sp_treatments <- read.csv("treatment.csv",stringsAsFactors = FALSE)%>% 
+  complete(Scientific_Name,Product_treated) %>% 
+  left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "Scientific_Name")
+
+sp_mitigation <- read.csv("mitigation.csv",stringsAsFactors = FALSE)
+
+product_sp <- as.list(c(unique(sp_treatments$Product_treated),
+                        unique(sp_mitigation$Common_Name)))
+
+if(!file.exists("outputdata/pei_monitoring_dist.rds")){
+  source("make_distance_matrix.R")
+}
+
+incidental_sites <- readRDS("outputdata/incidental_sites.rds")
+incidental <- readRDS("outputdata/incidental.rds")
+monitoring_sites <- readRDS("outputdata/monitoring_sites.rds")
+monitoring <- readRDS("outputdata/monitoring.rds")
+
+ns_incidental_dist <- readRDS("outputdata/ns_incidental_dist.rds")
+ns_monitoring_dist <- readRDS("outputdata/ns_monitoring_dist.rds")
+nb_incidental_dist <- readRDS("outputdata/nb_incidental_dist.rds")
+nb_monitoring_dist <- readRDS("outputdata/nb_monitoring_dist.rds")
+pei_incidental_dist <- readRDS("outputdata/pei_incidental_dist.rds")
+pei_monitoring_dist <- readRDS("outputdata/pei_monitoring_dist.rds")
+
+greenCrabIcon <- makeIcon(
+  iconUrl = "GreenCrab.png",
+  iconWidth = 50,
+  iconHeight = 37
+)
+
+source("functions.R")
+
+monitoring_filtered <- monitoring %>% 
+      as.data.table() %>% 
+      dplyr::select(-geometry) %>% 
+      gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
+      group_by(Species,StnLocation) %>% 
+      summarize(
+        Presence = if_else(all(is.na(Presence)),
+                                   FALSE,
+                                   any(Presence>0,na.rm = TRUE))
+        ) %>% 
+      ungroup() %>% 
+      mutate(Species=gsub("_"," ",Species),
+             Presence=as.character(Presence)) %>% 
+      pivot_longer(cols = c(Presence)) %>% 
+      pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
+      inner_join(monitoring_sites,by = "StnLocation")
+  
+  
+  incidental_filtered <- incidental %>% 
+      as.data.table() %>% 
+      dplyr::select(-geometry) %>% 
+      group_by(Species,StnLocation) %>% 
+      summarize(Presence = TRUE,
+                link=if_else(all(is.na(link)),
+                             "NA",
+                             paste0('<a href = "',unique(link),'"> ',Species,' </a>',collapse=" ")),
+                prov = paste(unique(prov))) %>% 
+      ungroup() %>% 
+      mutate(link=if_else(link=="NA",
+                          prov,
+                          link)) %>% 
+      left_join(incidental_sites,by = "StnLocation")
+
+
+all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
+                        dplyr::select(NB,Lease_Identifier),
+                        dplyr::select(PEI,Lease_Identifier))
+
+basemap(leases=all_leases,
+        incidentals=incidental_filtered,
+        monitoring=monitoring_filtered %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+        monitoringsp=AIS$Scientific_Name,
+        width="100%")
+
+```

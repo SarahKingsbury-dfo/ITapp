@@ -48,7 +48,7 @@ nearestsites <- function(lease,prov,sites,n,distmat){
 }
 
 #### basemap ####
-basemap <- function(leases, incidentals, monitoring, monitoringsp){
+basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
   
   # browser()
 
@@ -127,7 +127,7 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp){
   
   sp <- monitoringsp[monitoringsp %in% names(monitoring)]
   
-  leaflet(leases) %>%
+  leaflet(leases,...) %>%
     addTiles() %>%
     addPolygons(popup = paste("Lease:",leases$Lease_Identifier),group = "Leases") %>%
     addMarkers(data=incidentals$geometry,
