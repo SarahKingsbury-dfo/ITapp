@@ -72,6 +72,16 @@ if(!all(sort(unique(incidental_occ$Species)) %in% sort(species$Scientific_Name))
 }
 
 
+asian_shore_crab_2020 <- read.csv("recentdata/Asian_crab_2020_present_absent.csv")%>%
+  st_as_sf(coords=c('Long','Lat'),crs=4326) %>% 
+  filter(Presen_absent==1) %>% 
+  mutate(Species = "Hemigrapsus sanguineus",
+         prov = paste("Maritimes Science Data:", Observer),
+         Year = 2020,
+         StnLocation = paste("ASC:", Site.Name)) %>% 
+  select(Species,StnLocation,Year,prov)
+  
+
 gulf_tunicate_incidental <- readxl::read_excel("recentdata/Gulf AIS data_biof_monit_incidental_AISNCP MAR_April 2021.xlsx",sheet=2,col_types =  "text") %>%
   mutate('Longitude (W)'=case_when(`Latitude (N)`=="*waiting for coordinate"~-61.91,   #fixing bad data entry
                                    `Longitude (W)`>0~as.numeric(`Longitude (W)`)*-1,
@@ -110,6 +120,8 @@ if(!all(sort(unique(gulf_tunicate_incidental$Species)) %in% sort(species$Scienti
 
 incidental_sites <- rbind(incidental_occ %>% 
                             dplyr::select(StnLocation) ,
+                          asian_shore_crab_2020 %>% 
+                            dplyr::select(StnLocation) ,
                           gulf_tunicate_incidental %>% 
                             dplyr::select(StnLocation)) %>% 
   group_by(StnLocation) %>% 
@@ -122,6 +134,8 @@ incidental_sites <- rbind(incidental_occ %>%
   st_transform(proj)
 
 incidental <- bind_rows(incidental_occ %>%
+                          as.data.table(),
+                        asian_shore_crab_2020 %>%
                           as.data.table(),
                         gulf_tunicate_incidental %>%
                           as.data.table()) %>% 
