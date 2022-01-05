@@ -68,7 +68,7 @@ product_sp <- as.list(c(unique(sp_treatments$Product_treated),
                         unique(sp_mitigation$Common_Name)))
 
 if(!file.exists("outputdata/pei_monitoring_dist.rds")){
-  source("make_distance_matrix.R")
+  source("prepare_data.R")
 }
 
 incidental_sites <- readRDS("outputdata/incidental_sites.rds")

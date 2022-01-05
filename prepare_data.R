@@ -68,7 +68,7 @@ incidental_occ <- occ(query=species$Scientific_Name,
 
 if(!all(sort(unique(incidental_occ$Species)) %in% sort(species$Scientific_Name))){
   sp <- sort(unique(incidental_occ$Species))[!sort(unique(incidental_occ$Species)) %in% sort(species$Scientific_Name)]
-  warning(paste0(sp," is not found in a recognized species name, rename in `incidental_occ` which is in `make_distance_matrix.R`"))
+  warning(paste0(sp," is not found in a recognized species name, rename in `incidental_occ` which is in `prepare_data.R`"))
 }
 
 
