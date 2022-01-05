@@ -105,7 +105,7 @@ gulf_tunicate_incidental <- readxl::read_excel("recentdata/Gulf AIS data_biof_mo
 
 if(!all(sort(unique(gulf_tunicate_incidental$Species)) %in% sort(species$Scientific_Name))){
   sp <- sort(unique(gulf_tunicate_incidental$Species))[!sort(unique(gulf_tunicate_incidental$Species)) %in% sort(species$Scientific_Name)]
-  warning(paste0(sp," is not found in a recognized species name, rename in `gulf_tunicate_incidental` which is in `make_distance_matrix.R`"))
+  warning(paste0(sp," is not found in a recognized species name, rename in `gulf_tunicate_incidental` which is in `prepare_data.R`"))
 }
 
 incidental_sites <- rbind(incidental_occ %>% 
