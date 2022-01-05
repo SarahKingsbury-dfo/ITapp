@@ -155,12 +155,18 @@ maritimes_tunicate_monitor <- rbind(esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca
   dplyr::select(-OBJECTID,-Latitude,-Longitude,-FCName,-Prov,-sampler,-StnDescription,-StructureType,-StnNum)
 
 
-maritimes_tunicate_new <- read.csv("recentdata/AIS_2020_present_absent.csv")%>% 
+maritimes_tunicate_2020 <- read.csv("recentdata/AIS_2020_present_absent.csv")%>% 
   st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>% 
   dplyr::rename(Didemnum_vexillum=Didemnum_Vexillum)%>% 
   st_transform(proj)%>% 
   dplyr::select(-Region,-StnNum) %>% 
   mutate(Year=2020)
+
+maritimes_tunicate_2021 <- read.csv("recentdata/Final_AIS_2021_present_absent.csv")%>%
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
+  st_transform(proj)%>%
+  dplyr::select(-StnNum) %>%
+  mutate(Year=2021)
 
 
 # Gulf Tunicates
@@ -182,8 +188,10 @@ gulf_tunicate_monitor <- readxl::read_excel("recentdata/Gulf AIS data_biof_monit
 
 
 
-monitoring_sites <- rbind(maritimes_tunicate_new %>% 
-                            dplyr::select(StnLocation) ,
+monitoring_sites <- rbind(maritimes_tunicate_2020 %>% 
+                            dplyr::select(StnLocation),
+                          maritimes_tunicate_2021 %>% 
+                            dplyr::select(StnLocation),
                           maritimes_tunicate_monitor %>% 
                             dplyr::select(StnLocation),
                           gulf_tunicate_monitor %>% 
@@ -198,7 +206,9 @@ monitoring_sites <- rbind(maritimes_tunicate_new %>%
            lengths()>0) %>% 
   st_transform(proj)
 
-monitoring <- bind_rows(maritimes_tunicate_new %>% 
+monitoring <- bind_rows(maritimes_tunicate_2020 %>% 
+                          as.data.table(),
+                        maritimes_tunicate_2021 %>% 
                           as.data.table(),
                         maritimes_tunicate_monitor %>% 
                           as.data.table(),
