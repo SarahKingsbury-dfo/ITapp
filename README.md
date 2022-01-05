@@ -6,7 +6,7 @@ Currently, the app is operational for DFO Maritimes and Gulf region and will gen
 
 # Installation
 
-- Users must first install R (on DFO computers, you can do that from the Software Center)
+- Users must first install "R" and "R Studio" (on DFO computers, you can do that from the Software Center)
 - [Download](https://github.com/remi-daigle/ITapp/archive/master.zip) and unzip this repository or otherwise clone the code onto your computer.
 - RStudio based usage: Open `ITapp.Rproj` in RStudio, open the `app.R` file, then click on the `Run App` button
 - Shortcut based usage:  Create a shortcut to `ITapp.bat` in a convenient location (e.g. your desktop), double click on your shorcut. This method assumes you have R v.4.1.1 installed in a specific location (e.g. `C:\Program Files\R\R-4.1.1\bin\R.exe`)
