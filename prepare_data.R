@@ -263,7 +263,9 @@ monitoring <- bind_rows(maritimes_tunicate_2020 %>%
                           as.data.table(),
                         maritimes_tunicate_monitor %>% 
                           as.data.table(),
-                        gulf_tunicate_monitor %>% 
+                        gulf_tunicate_monitor_2020 %>% 
+                          as.data.table(),
+                        gulf_tunicate_monitor_2021%>%
                           as.data.table()) %>% 
   dplyr::select(-geometry) %>% 
   gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
