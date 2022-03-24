@@ -82,7 +82,7 @@ asian_shore_crab_2020 <- read.csv("recentdata/Asian_crab_2020_present_absent.csv
   select(Species,StnLocation,Year,prov)
   
 
-gulf_tunicate_incidental <- readxl::read_excel("recentdata/Gulf AIS data_biof_monit_incidental_AISNCP MAR_April 2021.xlsx",sheet=2,col_types =  "text") %>%
+gulf_tunicate_incidental_2020 <- readxl::read_excel("recentdata/Gulf AIS data_biof_monit_incidental_AISNCP MAR_April 2021.xlsx",sheet=2,col_types =  "text") %>%
   mutate('Longitude (W)'=case_when(`Latitude (N)`=="*waiting for coordinate"~-61.91,   #fixing bad data entry
                                    `Longitude (W)`>0~as.numeric(`Longitude (W)`)*-1,
                                    TRUE~as.numeric(`Longitude (W)`)),
@@ -113,8 +113,31 @@ gulf_tunicate_incidental <- readxl::read_excel("recentdata/Gulf AIS data_biof_mo
          prov="Gulf Science Data contact Renee.Bernier@dfo-mpo.gc.ca") %>% 
   st_cast('POINT')
 
-if(!all(sort(unique(gulf_tunicate_incidental$Species)) %in% sort(species$Scientific_Name))){
-  sp <- sort(unique(gulf_tunicate_incidental$Species))[!sort(unique(gulf_tunicate_incidental$Species)) %in% sort(species$Scientific_Name)]
+gulf_tunicate_incidental_2021 <- readxl::read_excel("recentdata/Copy of P-A Table_2021 data_March2022.xlsx",sheet=2,col_types =  "text") %>% 
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
+  dplyr::rename(StnLocation=Location,
+                "Botryllus_schlosseri"="B schlosseri",
+                "Botrylloides_violaceus"="B violaceus",
+                "Ciona_intestinalis"="C intestinalis",
+                "Styela_clava"="S clava",
+                #"Caprella_mutica"="C mutica",
+                #"Membranipora_membranacea"="M membranacea", 
+                "Carcinus_maenas"="C maenas",
+                "Codium_fragile"="C fragile") %>% 
+  dplyr::select(-Province,-Comments) %>% 
+  gather(key = "Species", value = "Presence",-StnLocation,-Year,-geometry) %>% 
+  group_by(Species,StnLocation,Year) %>% 
+  summarize(Presence = if_else(all(is.na(Presence)),
+                               FALSE,
+                               any(Presence>0,na.rm = TRUE))) %>% 
+  ungroup() %>% 
+  filter(Presence) %>% 
+  mutate(Species=gsub("_"," ",Species),
+         prov="Gulf Science Data contact Renee.Bernier@dfo-mpo.gc.ca") %>% 
+  st_cast('POINT')
+
+if(!all(sort(unique(gulf_tunicate_incidental_2020$Species)) %in% sort(species$Scientific_Name))){
+  sp <- sort(unique(gulf_tunicate_incidental_2020$Species))[!sort(unique(gulf_tunicate_incidental_2020$Species)) %in% sort(species$Scientific_Name)]
   warning(paste0(sp," is not found in a recognized species name, rename in `gulf_tunicate_incidental` which is in `prepare_data.R`"))
 }
 
@@ -122,8 +145,10 @@ incidental_sites <- rbind(incidental_occ %>%
                             dplyr::select(StnLocation) ,
                           asian_shore_crab_2020 %>% 
                             dplyr::select(StnLocation) ,
-                          gulf_tunicate_incidental %>% 
-                            dplyr::select(StnLocation)) %>% 
+                          gulf_tunicate_incidental_2020 %>% 
+                            dplyr::select(StnLocation),
+                          gulf_tunicate_incidental_2021%>% 
+                            dplyr::select(StnLocation))%>%
   group_by(StnLocation) %>% 
   summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
   unique() %>% 
@@ -188,7 +213,19 @@ maritimes_tunicate_2021 <- read.csv("recentdata/Final_AIS_2021_present_absent.cs
 # the above Gulf data is included in the xlsx file below
 
 
-gulf_tunicate_monitor <- readxl::read_excel("recentdata/Gulf AIS data_biof_monit_incidental_AISNCP MAR_April 2021.xlsx") %>% 
+gulf_tunicate_monitor_2020 <- readxl::read_excel("recentdata/Gulf AIS data_biof_monit_incidental_AISNCP MAR_April 2021.xlsx") %>% 
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
+  dplyr::rename(StnLocation=Station,
+                "Botryllus_schlosseri"="B schlosseri",
+                "Botrylloides_violaceus"="B violaceus",
+                "Ciona_intestinalis"="C intestinalis",
+                "Styela_clava"="S clava",
+                "Caprella_mutica"="C mutica",
+                "Membranipora_membranacea"="M membranacea", 
+                "Carcinus_maenas"="C maenas",
+                "Codium_fragile"="C fragile")
+
+gulf_tunicate_monitor_2021 <- readxl::read_excel("recentdata/Copy of P-A Table_2021 data_March2022.xlsx") %>% 
   st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
   dplyr::rename(StnLocation=Station,
                 "Botryllus_schlosseri"="B schlosseri",
