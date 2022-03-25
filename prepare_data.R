@@ -159,10 +159,16 @@ incidental_sites <- rbind(incidental_occ %>%
   st_transform(proj)
 
 incidental <- bind_rows(incidental_occ %>%
+                          mutate(across(.fns = as.character))%>%
                           as.data.table(),
                         asian_shore_crab_2020 %>%
+                          mutate(across(.fns = as.character))%>%
                           as.data.table(),
-                        gulf_tunicate_incidental %>%
+                        gulf_tunicate_incidental_2020 %>%
+                          mutate(across(.fns = as.character))%>%
+                          as.data.table(),
+                        gulf_tunicate_incidental_2021 %>%
+                          mutate(across(.fns = as.character))%>%
                           as.data.table()) %>% 
   dplyr::select(Species,StnLocation,Year,prov,link) %>% 
   right_join(incidental_sites,by = "StnLocation") %>% 
@@ -174,21 +180,22 @@ saveRDS(incidental,"outputdata/incidental.rds")
 # Load and clean up monitoring data ---------------------------------------
 
 # Maritimes Tunicates
-maritimes_tunicate_monitor <- rbind(esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/1"),
+maritimes_tunicate_monitor <- rbind(
+  #esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/1"),
                                     esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/7"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/13"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/19"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/25"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/34"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/43"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/54"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/66"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/79"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/92"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/104"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/117"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/136"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/154"))%>% 
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/13"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/19"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/25"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/34"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/43"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/54"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/66"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/79"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/92"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/104"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/117"),
+                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/136"),
+                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/154"))%>%
   dplyr::rename(geometry=geoms,Year = Year_Observed)%>% 
   st_transform(proj) %>% 
   dplyr::select(-OBJECTID,-Latitude,-Longitude,-FCName,-Prov,-sampler,-StnDescription,-StructureType,-StnNum)
@@ -261,7 +268,7 @@ monitoring <- bind_rows(maritimes_tunicate_2020 %>%
                           as.data.table(),
                         maritimes_tunicate_2021 %>% 
                           as.data.table(),
-                        maritimes_tunicate_monitor %>% 
+                        maritimes_tunicate_monitor %>%
                           as.data.table(),
                         gulf_tunicate_monitor_2020 %>% 
                           as.data.table(),
