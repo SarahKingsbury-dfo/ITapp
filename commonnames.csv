@@ -1,16 +1,16 @@
-Common_Name,Scientific_Name
-Pancake batter tunicate,Didemnum vexillum
-Golden star tunicate,Botryllus schlosseri
-Violet tunicate,Botrylloides violaceus
-Compound sea squirt,Diplosoma listerianum
-Vase tunicate,Ciona intestinalis
-Clubbed tunicate,Styela clava
-European sea squirt,Ascidiella aspersa
-Japanese skeleton shrimp,Caprella mutica
-European green crab,Carcinus maenas
-Oyster thief,Codium fragile
-Coffin Box Bryozoan,Membranipora membranacea
-Asian Shore Crab,Hemigrapsus sanguineus
-Rainbow trout,Oncorhynchus mykiss
-Bay scallop,Argopecten irradians
-European oyster,Ostrea edulis
+Common_Name,Scientific_Name,R_Name
+Pancake batter tunicate,Didemnum vexillum,Didemnum_vexillum
+Golden star tunicate,Botryllus schlosseri,Botryllus_schlosseri
+Violet tunicate,Botrylloides violaceus,Botrylloides_violaceus
+Compound sea squirt,Diplosoma listerianum,Diplosoma_listerianum
+Vase tunicate,Ciona intestinalis,Ciona_intestinalis
+Clubbed tunicate,Styela clava,Styela_clava
+European sea squirt,Ascidiella aspersa,Ascidiella_aspersa
+Japanese skeleton shrimp,Caprella mutica,Caprella_mutica
+European green crab,Carcinus maenas,Carcinus_maenas
+Oyster thief,Codium fragile,Codium_fragile
+Coffin Box Bryozoan,Membranipora membranacea,Membranipora_membranacea
+Asian Shore Crab,Hemigrapsus sanguineus,Hemigrapsus_sanguineus
+Rainbow trout,Oncorhynchus mykiss,Oncorhynchus_mykiss
+Bay scallop,Argopecten irradians,Argopecten_irradians
+European oyster,Ostrea edulis,Ostrea_edulis

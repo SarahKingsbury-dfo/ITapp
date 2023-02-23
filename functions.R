@@ -7,6 +7,7 @@ inwaterdistance <- function(origin, destination, transition){
 }
 
 
+
 #### nearestsites ####
 nearestsites <- function(lease,prov,sites,n,distmat){
   # if("MF-0491"==lease$Lease_Identifier){browser()}
@@ -17,7 +18,7 @@ nearestsites <- function(lease,prov,sites,n,distmat){
     stop("Invalid lease identifier (prov error")
   }
   if(!lease$Lease_Identifier %in% row.names(distmat)){
-    browser()
+    #browser()
     stop("Invalid lease identifier (distmat error)")
   }
   
@@ -48,69 +49,89 @@ nearestsites <- function(lease,prov,sites,n,distmat){
 }
 
 #### basemap ####
-basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
+basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding, metabarcodingsp, ...){
   
   # browser()
 
   IncidentalIcons <- iconList(
-    "Argopecten irradians" = makeIcon(
-      iconUrl = "blackCrab.png",
+    "Argopecten_irradians" = makeIcon(
+      iconUrl = "mussel.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Ascidiella aspersa" = makeIcon(
-      iconUrl = "blackCrab.png",
+    "Ascidiella_aspersa" = makeIcon(
+      iconUrl = "tunicate.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Botrylloides violaceus" = makeIcon(
-      iconUrl = "blackCrab.png",
+    "Botrylloides_violaceus" = makeIcon(
+      iconUrl = "tunicate.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Botryllus schlosseri" = makeIcon(
-      iconUrl = "blackCrab.png",
+    "Botryllus_schlosseri" = makeIcon(
+      iconUrl = "tunicate.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Caprella mutica" = makeIcon(
-      iconUrl = "blackCrab.png",
+    "Caprella_mutica" = makeIcon(
+      iconUrl = "skeletonshrimp.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Carcinus maenas" = makeIcon(
+    "Carcinus_maenas" = makeIcon(
       iconUrl = "GreenCrab.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Ciona intestinalis" = makeIcon(
+    "Ciona_intestinalis" = makeIcon(
+      iconUrl = "tunicate.png",
+      iconWidth = 50,
+      iconHeight = 37),
+    "Codium_fragile" = makeIcon(
+      iconUrl = "algae.png",
+      iconWidth = 50,
+      iconHeight = 37),
+    "Didemnum_vexillum" = makeIcon(
+      iconUrl = "tunicate.png",
+      iconWidth = 50,
+      iconHeight = 37),
+    "Diplosoma_listerianum" = makeIcon(
+      iconUrl = "tunicate.png",
+      iconWidth = 50,
+      iconHeight = 37),
+    "Hemigrapsus_sanguineus" = makeIcon(
       iconUrl = "blackCrab.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Codium fragile" = makeIcon(
+    "Membranipora_membranacea" = makeIcon(
+      iconUrl = "algae.png",
+      iconWidth = 50,
+      iconHeight = 37),
+    "Oncorhynchus_mykiss" = makeIcon(
+      iconUrl = "trout.png",
+      iconWidth = 50,
+      iconHeight = 37),
+    "Ostrea_edulis" = makeIcon(
+      iconUrl = "mussel.png",
+      iconWidth = 50,
+      iconHeight = 37),
+    "Styela_clava" = makeIcon(
       iconUrl = "blackCrab.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Didemnum vexillum" = makeIcon(
-      iconUrl = "blackCrab.png",
+    "Procambarus_clarkii"=makeIcon(
+      iconUrl="crayfish.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Diplosoma listerianum" = makeIcon(
-      iconUrl = "blackCrab.png",
+    "Esox_niger"=makeIcon(
+      iconUrl="pike.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Hemigrapsus sanguineus" = makeIcon(
-      iconUrl = "blackCrab.png",
+    "Micopterus_dolomieu"=makeIcon(
+      iconUrl="trout.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Membranipora membranacea" = makeIcon(
-      iconUrl = "blackCrab.png",
+    "Cipangopaludina_chinensis"=makeIcon(
+      iconUrl="snail.png",
       iconWidth = 50,
       iconHeight = 37),
-    "Oncorhynchus mykiss" = makeIcon(
-      iconUrl = "blackCrab.png",
-      iconWidth = 50,
-      iconHeight = 37),
-    "Ostrea edulis" = makeIcon(
-      iconUrl = "blackCrab.png",
-      iconWidth = 50,
-      iconHeight = 37),
-    "Styela clava" = makeIcon(
-      iconUrl = "blackCrab.png",
+    "Carassius_auratus"=makeIcon(
+      iconUrl="goldfish.png",
       iconWidth = 50,
       iconHeight = 37)
   )
@@ -120,12 +141,21 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
                    unique(incidentals$Species[!incidentals$Species %in% names(IncidentalIcons)]),
                    collapse="\n"))
   }
+
   
+  
+  # if(!all(metabarcoding$Species %in% names(MetabarcodeIcons))){
+  #   warning(paste0("basemap() in functions.R does not have a logo associated with: ",
+  #                  unique(metabarcoding$Species[!metabarcoding$Species %in% names(MetabarcodeIcons)]),
+  #                  collapse="\n"))
+  # }
+
   # the url's need to be actual url's above for this to work, commenting out for now
   # html_legend <- paste0("<img src='",getwd(),"/",IncidentalIcons$`Carcinus maenas`$iconUrl,"'>  Incidental Observations")
   
   
   sp <- monitoringsp[monitoringsp %in% names(monitoring)]
+  sp_m<-metabarcodingsp[metabarcodingsp %in% names(metabarcoding)]
   
   leaflet(leases,...) %>%
     addTiles() %>%
@@ -134,6 +164,14 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
                icon = IncidentalIcons[as.numeric(factor(incidentals$Species,levels=sort(monitoringsp)))],
                group = incidentals$Species,
                popup = incidentals$link) %>%
+    addMinicharts(st_coordinates(metabarcoding$geometry)[,1],
+                  st_coordinates(metabarcoding$geometry)[,2],
+                  type="pie",
+                  chartdata=as.data.frame(metabarcoding)[,sp_m]) %>%
+    # addMarkers(data=metabarcoding$geometry,
+    #            icon = MetabarcodeIcons[as.numeric(factor(metabarcoding$Species,levels=sort(monitoringsp)))],
+    #            group = metabarcoding$Species,
+    # popup = metabarcoding$link) %>%
     addMinicharts(st_coordinates(monitoring$geometry)[,1],
                   st_coordinates(monitoring$geometry)[,2],
                   type="pie",
