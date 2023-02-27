@@ -11,11 +11,12 @@ inwaterdistance <- function(origin, destination, transition){
 #### nearestsites ####
 nearestsites <- function(lease,prov,sites,n,distmat){
   # if("MF-0491"==lease$Lease_Identifier){browser()}
+  #browser()
   if(length(lease$Lease_Identifier)==0){
     stop("Invalid lease identifier (lease error)")
   }
   if(!lease$Lease_Identifier %in% prov$Lease_Identifier){
-    stop("Invalid lease identifier (prov error")
+    stop("Invalid lease identifier (prov error)")
   }
   if(!lease$Lease_Identifier %in% row.names(distmat)){
     #browser()
@@ -51,7 +52,7 @@ nearestsites <- function(lease,prov,sites,n,distmat){
 #### basemap ####
 basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding, metabarcodingsp, ...){
   
-  # browser()
+ # browser()
 
   IncidentalIcons <- iconList(
     "Argopecten_irradians" = makeIcon(
@@ -153,7 +154,7 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
   # the url's need to be actual url's above for this to work, commenting out for now
   # html_legend <- paste0("<img src='",getwd(),"/",IncidentalIcons$`Carcinus maenas`$iconUrl,"'>  Incidental Observations")
   
-  
+
   sp <- monitoringsp[monitoringsp %in% names(monitoring)]
   sp_m<-metabarcodingsp[metabarcodingsp %in% names(metabarcoding)]
   
@@ -171,7 +172,7 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
     addMinicharts(st_coordinates(monitoring$geometry)[,1],
                   st_coordinates(monitoring$geometry)[,2],
                   type="pie",
-                  chartdata=as.data.frame(monitoring)[,sp]) %>%
+                  chartdata=as.data.frame(monitoring)[,sp_m]) %>%
     addLayersControl(overlayGroups = c("Leases",incidentals$Species),
                      options = layersControlOptions(collapsed = FALSE))
 }

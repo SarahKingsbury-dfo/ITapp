@@ -82,8 +82,10 @@ ns_monitoring_dist <- readRDS("outputdata/ns_monitoring_dist.rds")
 ns_metabarcoding_dist<-readRDS("outputdata/ns_metabarcoding_dist.rds")
 nb_incidental_dist <- readRDS("outputdata/nb_incidental_dist.rds")
 nb_monitoring_dist <- readRDS("outputdata/nb_monitoring_dist.rds")
+nb_metabarcoding_dist<-readRDS("outputdata/nb_metabarcoding_dist.rds")
 pei_incidental_dist <- readRDS("outputdata/pei_incidental_dist.rds")
 pei_monitoring_dist <- readRDS("outputdata/pei_monitoring_dist.rds")
+pei_metabarcoding_dist<-readRDS("outputdata/pei_metabarcoding_dist.rds")
 
 greenCrabIcon <- makeIcon(
   iconUrl = "GreenCrab.png",
@@ -154,7 +156,7 @@ ui <- navbarPage(
                numericInput(inputId = "destincidentalnum",
                          label = "Number of Incidental Observation Sites",
                          value = 3),
-               numericInput(inputId = "destmatebarcodingnum",
+               numericInput(inputId = "destmetabarcodingnum",
                             label = "Number of Metabarcoding Sites",
                             value = 3),
                checkboxGroupInput(inputId = "destmonitoringsite",
@@ -239,7 +241,7 @@ server <- function(input, output, session) {
   
   # reactive functions that filter data
   monitoring_filtered <- reactive({
-   # browser()
+    #browser()
     monitoring %>% 
       dplyr::filter(Year>=input$monitoringyear) %>% 
       as.data.table() %>% 
@@ -330,6 +332,7 @@ server <- function(input, output, session) {
   # functions for updating UI
   
   update_orig_sites <- function(lease,prov){
+   # browser()
 
     if(input$origmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
@@ -374,6 +377,8 @@ server <- function(input, output, session) {
   }
   
   update_dest_sites <- function(lease,prov){
+    #browser()
+    
     if(input$destmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                         prov,
@@ -403,8 +408,8 @@ server <- function(input, output, session) {
     
     if(input$destmetabarcodingnum!=""){
       nearestmetabarcoding <- nearestsites(lease,
-                                        prov,
-                                        metabarcoding_filtered()%>% filter(name=="Presence") %>% 
+                                           prov,
+                                        metabarcoding_filtered() %>% filter(name=="Presence")%>% 
                                           dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
                                         as.numeric(input$destmetabarcodingnum),
                                         metabarcoding_dist_dest())
@@ -554,8 +559,8 @@ server <- function(input, output, session) {
   metabarcoding_dist_orig <- reactive({
     switch(input$origprov,
            "NS" = ns_metabarcoding_dist,
-           "NB"=print("Data Not Available"),
-           "PEI"=print("Data Not Available"))
+           "NB"=nb_metabarcoding_dist,
+           "PEI"=pei_metabarcoding_dist)
   })
 
   monitoring_dist_dest <- reactive({
@@ -574,13 +579,16 @@ server <- function(input, output, session) {
   
   metabarcoding_dist_dest <- reactive({
     switch(input$destprov,
-           "NS" = ns_metabarcoding_dist)
+           "NS" = ns_metabarcoding_dist,
+           "NB" = nb_monitoring_dist,
+           "PEI" = pei_monitoring_dist)
   })
   #### Leaflet maps ####
   
   # full interactive map
   output$leafletmap <- renderLeaflet({
-    #browser()
+    browser()
+    
     all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
                         dplyr::select(NB,Lease_Identifier),
                         dplyr::select(PEI,Lease_Identifier))
@@ -599,7 +607,7 @@ server <- function(input, output, session) {
 
   # map for origin tab
   output$leafletorig <- renderLeaflet({
-    # browser()
+     #browser()
     print("making map")
     
     prov <- origprovInput()
@@ -633,17 +641,17 @@ server <- function(input, output, session) {
     
     if(input$origmetabarcodingnum!=""){
       nearestmetabarcoding <- nearestsites(lease,
-                                        prov,
-                                        metabarcoding_filtered()%>% filter(name=="Presence") %>% 
-                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% mutate(across(2:(ncol(.)-1),as.logical)),
-                                        as.numeric(input$origmetabarcodingnum),
-                                        metabarcoding_dist_orig())
+                                           prov,
+                                           metabarcoding_filtered()%>% filter(name=="Presence") %>% 
+                                             dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                           as.numeric(input$origmetabarcodingnum),
+                                           metabarcoding_dist_orig())
     }
 
     if(input$origincidentalnum!="" & input$origmonitoringnum!="" & input$origmetabarcodingnum!=""){
       basemap(leases=lease,
               incidentals=nearestincidental,
-              metabarcoding =nearestmetabarcoding,
+              metabarcoding=nearestmetabarcoding,
               monitoring=nearestmonitoring,
               monitoringsp=AIS$R_Name,
               metabarcodingsp=AIS$R_Name)
