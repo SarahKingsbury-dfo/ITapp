@@ -79,6 +79,7 @@ metabarcoding_sites<-readRDS("outputdata/metabarcoding_sites.rds")
 metabarcoding<-readRDS("outputdata/metabarcoding.rds")
 ns_incidental_dist <- readRDS("outputdata/ns_incidental_dist.rds")
 ns_monitoring_dist <- readRDS("outputdata/ns_monitoring_dist.rds")
+ns_metabarcoding_dist<-readRDS("outputdata/ns_metabarcoding_dist.rds")
 nb_incidental_dist <- readRDS("outputdata/nb_incidental_dist.rds")
 nb_monitoring_dist <- readRDS("outputdata/nb_monitoring_dist.rds")
 pei_incidental_dist <- readRDS("outputdata/pei_incidental_dist.rds")
@@ -117,7 +118,7 @@ ui <- navbarPage(
                          value = 5),
                numericInput(inputId = "origmetabarcodingnum",
                             label = "Number of Metabarcoding Sites",
-                            value = 5),
+                            value = 2),
                checkboxGroupInput(inputId = "origmonitoringsite",
                                   label = "Biofouling Monitoring Sites to Include",
                                   choices = "temp"),
@@ -219,7 +220,10 @@ ui <- navbarPage(
                         value = 1900),
            numericInput(inputId = "metabarcodingyear",
                         label = "Ignore metabarcoding records older than:",
-                        value = 1900)
+                        value = 1900),
+           numericInput(inputId = "metabarcodingstrikes",
+                        label = "Number of non-detection records required to reverse a detection (i.e. when is an AIS considered 'failed to establish'):",
+                        value = 3)
   ),
   
   tabPanel("Read Me",
@@ -267,7 +271,7 @@ server <- function(input, output, session) {
   
   
   incidental_filtered <- reactive({
-     #browser()
+    # browser()
     incidental %>% 
       filter(Year>=input$incidentalyear) %>% 
       as.data.table() %>% 
@@ -297,7 +301,7 @@ server <- function(input, output, session) {
       group_by(Species,StnLocation) %>% 
       summarize(
         History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
-                          length(Year)>input$monitoringstrikes&all(!tail(Presence,input$monitoringstrikes)) ~ paste0("Likely failed to establish, detected in: ",
+                          length(Year)>input$metabarcodingstrikes&all(!tail(Presence,input$metabarcodingstrikes)) ~ paste0("Likely failed to establish, detected in: ",
                                                                                                                      paste(Year[Presence],collapse = ", "),
                                                                                                                      ", and not detected in: ",
                                                                                                                      paste(Year[!Presence],collapse = ", ")),
@@ -311,9 +315,11 @@ server <- function(input, output, session) {
                            any(Presence>0,na.rm = TRUE))
       ) %>% 
       ungroup()%>%
-      mutate(prov=paste("Metabarcoding Results")) %>%
+      mutate(prov=paste("Metabarcoding Results"),
+             Presence=as.character(Presence)) %>%
+      tidyr::pivot_longer(cols = c(Presence,History)) %>% 
+      tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
       left_join(metabarcoding_sites,by = "StnLocation")
-
 
   })
 
@@ -324,6 +330,7 @@ server <- function(input, output, session) {
   # functions for updating UI
   
   update_orig_sites <- function(lease,prov){
+
     if(input$origmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                         prov,
@@ -350,6 +357,7 @@ server <- function(input, output, session) {
                                "origincidentalsite",
                                choices = nearestincidental$StnLocation)
     }
+    
     if(input$origmetabarcodingnum!=""){
       nearestmetabarcoding <- nearestsites(lease,
                                         prov,
@@ -362,6 +370,7 @@ server <- function(input, output, session) {
                                "origmetabarcodingsite",
                                choices = nearestmetabarcoding$StnLocation)
     }
+    
   }
   
   update_dest_sites <- function(lease,prov){
@@ -391,6 +400,7 @@ server <- function(input, output, session) {
                                "destincidentalsite",
                                choices = nearestincidental$StnLocation)
     }
+    
     if(input$destmetabarcodingnum!=""){
       nearestmetabarcoding <- nearestsites(lease,
                                         prov,
@@ -543,7 +553,9 @@ server <- function(input, output, session) {
   
   metabarcoding_dist_orig <- reactive({
     switch(input$origprov,
-           "NS" = ns_metabarcoding_dist)
+           "NS" = ns_metabarcoding_dist,
+           "NB"=print("Data Not Available"),
+           "PEI"=print("Data Not Available"))
   })
 
   monitoring_dist_dest <- reactive({
@@ -568,12 +580,15 @@ server <- function(input, output, session) {
   
   # full interactive map
   output$leafletmap <- renderLeaflet({
+    #browser()
     all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
                         dplyr::select(NB,Lease_Identifier),
                         dplyr::select(PEI,Lease_Identifier))
     basemap(leases=all_leases,
             incidentals=incidental_filtered(),
-            metabarcoding=metabarcoding_filtered(),
+            metabarcoding=metabarcoding_filtered()%>% filter(name=="Presence") %>% 
+              dplyr::select(-name) %>% 
+              mutate(across(2:(ncol(.)-1),as.logical)),
             monitoring=monitoring_filtered() %>% filter(name=="Presence") %>% 
               dplyr::select(-name) %>% 
               mutate(across(2:(ncol(.)-1),as.logical)),
@@ -584,7 +599,7 @@ server <- function(input, output, session) {
 
   # map for origin tab
   output$leafletorig <- renderLeaflet({
-     browser()
+    # browser()
     print("making map")
     
     prov <- origprovInput()
@@ -633,6 +648,7 @@ server <- function(input, output, session) {
               monitoringsp=AIS$R_Name,
               metabarcodingsp=AIS$R_Name)
     }
+    
    
   })
 
@@ -684,12 +700,7 @@ server <- function(input, output, session) {
               metabarcodingsp=AIS$R_Name)
     }
 
-    # if(input$destmetabarcodingnum!="" & input$destmonitoringnum!=""){
-    #   basemap(leases=lease,
-    #           incidentals=nearestmetabarcoding,
-    #           monitoring=nearestmonitoring,
-    #           monitoringsp=AIS$R_Name)
-    # }
+ 
   })
   
   

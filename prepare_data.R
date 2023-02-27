@@ -204,15 +204,14 @@ metabarcode_2021<-read.csv("recentdata/metbarcoding_sites_2021.csv")%>%
 
 
 metabarcoding_sites<-metabarcode_2021%>% 
-  group_by(StnLocation) %>% 
-  summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
-  unique() %>% 
-  st_transform(equidist) %>% 
-  filter(geometry%>%
-           st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>%
-           lengths()>0) %>%
-  st_transform(proj)
- 
+    group_by(StnLocation) %>% 
+    summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
+    unique() %>% 
+    st_transform(equidist) %>% 
+    filter(geometry%>% 
+             st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
+             lengths()>0) %>% 
+    st_transform(proj)
   
 saveRDS(metabarcoding_sites, "outputdata/metabarcoding_sites.rds")
 saveRDS(metabarcode_2021, "outputdata/metabarcoding.rds")
@@ -445,6 +444,15 @@ row.names(nb_monitoring_dist) <- NB$Lease_Identifier
 colnames(nb_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(nb_monitoring_dist,"outputdata/nb_monitoring_dist.rds")
 
+nb_metabarcoding_dist <- do.call(rbind,(lapply(NB$geometry %>%
+                                                 st_transform(equidist),
+                                               function(x) inwaterdistance(metabarcoding_sites %>%
+                                                                             st_transform(equidist),
+                                                                           x,
+                                                                           tr))))
+row.names(nb_metabarcoding_dist) <- NB$Lease_Identifier
+colnames(nb_metabarcoding_dist) <- metabarcoding_sites$StnLocation
+saveRDS(nb_metabarcoding_dist,"outputdata/nb_metabarcoding_dist.rds")
 
 #### PEI vs  incidentals and monitoring ####
 
@@ -468,3 +476,13 @@ pei_monitoring_dist <- do.call(rbind,(lapply(PEI$geometry %>%
 row.names(pei_monitoring_dist) <- PEI$Lease_Identifier
 colnames(pei_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(pei_monitoring_dist,"outputdata/pei_monitoring_dist.rds")
+
+pei_metabarcoding_dist <- do.call(rbind,(lapply(PEI$geometry %>%
+                                                 st_transform(equidist),
+                                               function(x) inwaterdistance(metabarcoding_sites %>%
+                                                                             st_transform(equidist),
+                                                                           x,
+                                                                           tr))))
+row.names(pei_metabarcoding_dist) <- PEI$Lease_Identifier
+colnames(pei_metabarcoding_dist) <- metabarcoding_sites$StnLocation
+saveRDS(pei_metabarcoding_dist,"outputdata/pei_metabarcoding_dist.rds")

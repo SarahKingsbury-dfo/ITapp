@@ -37,7 +37,7 @@ nearestsites <- function(lease,prov,sites,n,distmat){
       top_n(-n,distance) %>% 
       arrange(distance) %>% 
       mutate(StnLocation = paste0(StnLocation," (",round(distance/1000)," km)"))
-  }   else {
+  } else {
     # sites for incidentals
     sites %>%
       left_join(distances, by = "StnLocation") %>% 
@@ -168,15 +168,10 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
                   st_coordinates(metabarcoding$geometry)[,2],
                   type="pie",
                   chartdata=as.data.frame(metabarcoding)[,sp_m]) %>%
-    # addMarkers(data=metabarcoding$geometry,
-    #            icon = MetabarcodeIcons[as.numeric(factor(metabarcoding$Species,levels=sort(monitoringsp)))],
-    #            group = metabarcoding$Species,
-    # popup = metabarcoding$link) %>%
     addMinicharts(st_coordinates(monitoring$geometry)[,1],
                   st_coordinates(monitoring$geometry)[,2],
                   type="pie",
                   chartdata=as.data.frame(monitoring)[,sp]) %>%
-    # addControl(html = html_legend, position = "bottomright") %>% 
     addLayersControl(overlayGroups = c("Leases",incidentals$Species),
                      options = layersControlOptions(collapsed = FALSE))
 }
