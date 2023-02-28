@@ -52,7 +52,7 @@ nearestsites <- function(lease,prov,sites,n,distmat){
 #### basemap ####
 basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding, metabarcodingsp, ...){
   
- # browser()
+  #browser()
 
   IncidentalIcons <- iconList(
     "Argopecten_irradians" = makeIcon(
@@ -154,7 +154,9 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
   # the url's need to be actual url's above for this to work, commenting out for now
   # html_legend <- paste0("<img src='",getwd(),"/",IncidentalIcons$`Carcinus maenas`$iconUrl,"'>  Incidental Observations")
   
-
+print(monitoringsp)
+print(metabarcodingsp)
+print(monitoring)
   sp <- monitoringsp[monitoringsp %in% names(monitoring)]
   sp_m<-metabarcodingsp[metabarcodingsp %in% names(metabarcoding)]
   

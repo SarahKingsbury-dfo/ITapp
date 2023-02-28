@@ -57,6 +57,7 @@ PEI <- readRDS("spatialdata/PEI.rds")
 
 
 AIS <- read.csv("commonnames.csv")
+AIS_meta<-read.csv("commonnames.csv")
 
 sp_treatments <- read.csv("treatment.csv",stringsAsFactors = FALSE)%>% 
   complete(Scientific_Name,Product_treated, R_Name) %>% 
@@ -264,8 +265,7 @@ server <- function(input, output, session) {
                                    any(Presence>0,na.rm = TRUE))
         ) %>% 
       ungroup() %>% 
-      mutate(Species=gsub("_"," ",Species),
-             Presence=as.character(Presence)) %>%  
+      mutate(Presence=as.character(Presence)) %>%  
       tidyr::pivot_longer(cols = c(Presence,History)) %>% 
       tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
       inner_join(monitoring_sites,by = "StnLocation")
@@ -587,7 +587,7 @@ server <- function(input, output, session) {
   
   # full interactive map
   output$leafletmap <- renderLeaflet({
-    browser()
+   # browser()
     
     all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
                         dplyr::select(NB,Lease_Identifier),
@@ -601,7 +601,7 @@ server <- function(input, output, session) {
               dplyr::select(-name) %>% 
               mutate(across(2:(ncol(.)-1),as.logical)),
             monitoringsp=AIS$R_Name,
-            metabarcodingsp=AIS$R_Name)
+            metabarcodingsp=AIS_meta$R_Name)
   })
 
 
@@ -694,7 +694,9 @@ server <- function(input, output, session) {
     if(input$destmetabarcodingnum!=""){
       nearestmetabarcoding <- nearestsites(lease,
                                         prov,
-                                        metabarcoding_filtered(),
+                                        metabarcoding_filtered() %>% filter(name=="Presence") %>% 
+                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                       # metabarcoding_filtered(),
                                         as.numeric(input$destmetabarcodingnum),
                                         metabarcoding_dist_dest())
     }
@@ -705,7 +707,7 @@ server <- function(input, output, session) {
               metabarcoding=nearestmetabarcoding,
               monitoring=nearestmonitoring,
               monitoringsp=AIS$R_Name,
-              metabarcodingsp=AIS$R_Name)
+              metabarcodingsp=AIS_meta$R_Name)
     }
 
  
@@ -751,7 +753,8 @@ server <- function(input, output, session) {
           filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>% 
           data.frame() %>% 
           gather(key="Species",value="Presence",-StnLocation) %>% 
-          mutate(Species=gsub("\\."," ",Species)) %>% 
+          #mutate(Species=gsub("\\."," ",Species)) %>%
+          mutate(Species=gsub("\\.","_",Species)) %>% 
           filter(Species %in% AIS$R_Name) %>% 
           group_by(Species) %>% 
           summarize(Presence = any(as.logical(Presence)))
@@ -766,7 +769,8 @@ server <- function(input, output, session) {
           filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>% 
           data.frame() %>% 
           gather(key="Species",value="Presence",-StnLocation) %>% 
-          mutate(Species=gsub("\\."," ",Species)) %>% 
+          #mutate(Species=gsub("\\."," ",Species)) %>% 
+          mutate(Species=gsub("\\.","_",Species)) %>% 
           filter(Species %in% AIS$R_Name) %>% 
           group_by(Species) %>% 
           summarize(Presence = any(as.logical(Presence)))
@@ -781,7 +785,8 @@ server <- function(input, output, session) {
           bind_rows(incidental_filtered() %>% 
                       filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$origincidentalsite)) %>% 
                       data.frame() %>% 
-                      mutate(Species=gsub("\\."," ",Species)) %>% 
+                      #mutate(Species=gsub("\\."," ",Species)) %>% 
+                      mutate(Species=gsub("\\.","_",Species)) %>% 
                       filter(Species %in% AIS$R_Name) %>% 
                       group_by(Species) %>% 
                       summarize(Presence = any(as.logical(Presence)))) %>% 
@@ -797,7 +802,8 @@ server <- function(input, output, session) {
           bind_rows(incidental_filtered() %>% 
                       filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$destincidentalsite)) %>% 
                       data.frame() %>% 
-                      mutate(Species=gsub("\\."," ",Species)) %>% 
+                      #mutate(Species=gsub("\\."," ",Species)) %>% erased _ between species names
+                      mutate(Species=gsub("\\.","_",Species)) %>% 
                       filter(Species %in% AIS$R_Name) %>% 
                       group_by(Species) %>% 
                       summarize(Presence = any(as.logical(Presence)))) %>% 
@@ -827,7 +833,8 @@ server <- function(input, output, session) {
           bind_rows(metabarcoding_filtered() %>%
                       filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmetabarcodingsite)) %>%
                       data.frame() %>%
-                      mutate(Species=gsub("\\."," ",Species)) %>%
+                      #mutate(Species=gsub("\\."," ",Species)) %>%
+                      mutate(Species=gsub("\\.","_",Species)) %>%
                       filter(Species %in% AIS$R_Name) %>%
                       group_by(Species) %>%
                       summarize(Presence = any(as.logical(Presence)))) %>%
@@ -935,14 +942,16 @@ server <- function(input, output, session) {
       data.frame() %>%
       dplyr::select(-StnLocation) %>% 
       gather(key="Species",value="History") %>%
-      mutate(Species=gsub("\\."," ",Species)) %>%
+     # mutate(Species=gsub("\\."," ",Species)) %>%
+      mutate(Species=gsub("\\.","_",Species)) %>%
       filter(Species %in% AIS$R_Name)
     destination <- monitoring_filtered() %>%
       filter(name=="History"&gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>%
       data.frame()%>%
       dplyr::select(-StnLocation) %>% 
       gather(key="Species",value="History") %>%
-      mutate(Species=gsub("\\."," ",Species)) %>%
+     # mutate(Species=gsub("\\."," ",Species)) %>%
+      mutate(Species=gsub("\\.","_",Species)) %>%
       filter(Species %in% AIS$R_Name)
     full_join(origin,destination,by="Species", suffix=c(" (Origin)"," (Destination)"))
   },
