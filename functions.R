@@ -57,84 +57,84 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
   IncidentalIcons <- iconList(
     "Argopecten_irradians" = makeIcon(
       iconUrl = "mussel.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Ascidiella_aspersa" = makeIcon(
       iconUrl = "tunicate.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Botrylloides_violaceus" = makeIcon(
       iconUrl = "tunicate.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Botryllus_schlosseri" = makeIcon(
       iconUrl = "tunicate.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Caprella_mutica" = makeIcon(
       iconUrl = "skeletonshrimp.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Carcinus_maenas" = makeIcon(
       iconUrl = "GreenCrab.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Ciona_intestinalis" = makeIcon(
       iconUrl = "tunicate.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Codium_fragile" = makeIcon(
       iconUrl = "algae.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Didemnum_vexillum" = makeIcon(
       iconUrl = "tunicate.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Diplosoma_listerianum" = makeIcon(
       iconUrl = "tunicate.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Hemigrapsus_sanguineus" = makeIcon(
       iconUrl = "blackCrab.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Membranipora_membranacea" = makeIcon(
       iconUrl = "algae.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Oncorhynchus_mykiss" = makeIcon(
       iconUrl = "trout.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Ostrea_edulis" = makeIcon(
       iconUrl = "mussel.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Styela_clava" = makeIcon(
       iconUrl = "blackCrab.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Procambarus_clarkii"=makeIcon(
       iconUrl="crayfish.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Esox_niger"=makeIcon(
       iconUrl="pike.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Micopterus_dolomieu"=makeIcon(
       iconUrl="trout.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Cipangopaludina_chinensis"=makeIcon(
       iconUrl="snail.png",
-      iconWidth = 50,
-      iconHeight = 37),
+      iconWidth = 30,
+      iconHeight = 15),
     "Carassius_auratus"=makeIcon(
       iconUrl="goldfish.png",
-      iconWidth = 50,
-      iconHeight = 37)
+      iconWidth = 30,
+      iconHeight = 15)
   )
   
   if(!all(incidentals$Species %in% names(IncidentalIcons))){
@@ -154,9 +154,7 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
   # the url's need to be actual url's above for this to work, commenting out for now
   # html_legend <- paste0("<img src='",getwd(),"/",IncidentalIcons$`Carcinus maenas`$iconUrl,"'>  Incidental Observations")
   
-print(monitoringsp)
-print(metabarcodingsp)
-print(monitoring)
+
   sp <- monitoringsp[monitoringsp %in% names(monitoring)]
   sp_m<-metabarcodingsp[metabarcodingsp %in% names(metabarcoding)]
   
@@ -170,11 +168,19 @@ print(monitoring)
     addMinicharts(st_coordinates(metabarcoding$geometry)[,1],
                   st_coordinates(metabarcoding$geometry)[,2],
                   type="pie",
-                  chartdata=as.data.frame(metabarcoding)[,sp_m]) %>%
+                  chartdata=as.data.frame(metabarcoding)[,sp_m],
+                  #colorPalette = colors,
+                  legend=TRUE,
+                  legendPosition = 'bottomright',
+                  popupOptions = list(closeButton=FALSE, showTitle=TRUE),
+                  ) %>%
     addMinicharts(st_coordinates(monitoring$geometry)[,1],
                   st_coordinates(monitoring$geometry)[,2],
                   type="pie",
-                  chartdata=as.data.frame(monitoring)[,sp_m]) %>%
+                  chartdata=as.data.frame(monitoring)[,sp_m],
+                  #colorPalette = d3.schemeCategory10,
+                  legend = TRUE,
+                  legendPosition = 'topright') %>%
     addLayersControl(overlayGroups = c("Leases",incidentals$Species),
                      options = layersControlOptions(collapsed = FALSE))
 }

@@ -718,7 +718,7 @@ server <- function(input, output, session) {
   
   summaryValues <- reactive({
     print("Generating Summary")
-    # browser()
+     browser()
     
     # prevent summary/suggested responses if inadequate sites selected
     if(is.null(input$origmonitoringsite)&
@@ -866,7 +866,8 @@ server <- function(input, output, session) {
   
   output$mitigation <- renderTable({
     summarymitigation <- summaryValues()
-    # browser()
+     #browser()
+     
     if(ncol(summarymitigation)>1){
       if(length(input$product)>0){
         summarymitigation <- summarymitigation %>% 
