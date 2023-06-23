@@ -154,9 +154,13 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
   # the url's need to be actual url's above for this to work, commenting out for now
   # html_legend <- paste0("<img src='",getwd(),"/",IncidentalIcons$`Carcinus maenas`$iconUrl,"'>  Incidental Observations")
   
-
+ #browser()
   sp <- monitoringsp[monitoringsp %in% names(monitoring)]
-  sp_m<-metabarcodingsp[metabarcodingsp %in% names(metabarcoding)]
+  sp_m<-metabarcoding%>%
+    dplyr::select(-StnLocation, -distance)%>%
+    tidyr::pivot_longer(!geometry, names_to="species", values_to="presence")%>%
+    dplyr::filter(presence=="TRUE")%>%
+    dplyr::select(species)
   
   leaflet(leases,...) %>%
     addTiles() %>%
@@ -165,23 +169,34 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
                icon = IncidentalIcons[as.numeric(factor(incidentals$Species,levels=sort(monitoringsp)))],
                group = incidentals$Species,
                popup = incidentals$link) %>%
-    addMinicharts(st_coordinates(metabarcoding$geometry)[,1],
-                  st_coordinates(metabarcoding$geometry)[,2],
-                  type="pie",
-                  chartdata=as.data.frame(metabarcoding)[,sp_m],
-                  #colorPalette = colors,
-                  legend=TRUE,
-                  legendPosition = 'bottomright',
-                  popupOptions = list(closeButton=FALSE, showTitle=TRUE),
-                  ) %>%
+    # addMinicharts(st_coordinates(metabarcoding$geometry)[,1],
+    #               st_coordinates(metabarcoding$geometry)[,2],
+    #               type="pie",
+    #               chartdata=as.data.frame(metabarcoding)[,sp_m],
+    #               #colorPalette = colors,
+    #               legend=TRUE,
+    #               legendPosition = 'bottomright',
+    #               layerId = metabarcoding,
+    #               popupOptions = list(closeButton=FALSE, showTitle=TRUE),
+    #               ) %>%
+    addCircleMarkers(
+      data=metabarcoding$geometry,
+      color= "lightyellow",
+      weight=1,
+      group="metabarcoding",
+      label=paste("Presence Present:", "<br>",
+                  sp_m)%>%
+        lapply(htmltools::HTML),
+    )%>%
     addMinicharts(st_coordinates(monitoring$geometry)[,1],
                   st_coordinates(monitoring$geometry)[,2],
                   type="pie",
-                  chartdata=as.data.frame(monitoring)[,sp_m],
+                  chartdata=as.data.frame(monitoring)[,sp],
+                  #layerId= monitoring,
                   #colorPalette = d3.schemeCategory10,
                   legend = TRUE,
                   legendPosition = 'topright') %>%
-    addLayersControl(overlayGroups = c("Leases",incidentals$Species),
+    addLayersControl(overlayGroups = c("Leases",incidentals$Species, "metabarcoding"),
                      options = layersControlOptions(collapsed = FALSE))
 }
 

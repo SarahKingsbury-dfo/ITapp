@@ -59,7 +59,7 @@ PEI <- readRDS("spatialdata/PEI.rds")
 AIS <- read.csv("commonnames.csv")
 AIS_meta<-read.csv("commonnames.csv")
 
-sp_treatments <- read.csv("treatment.csv",stringsAsFactors = FALSE)%>% 
+sp_treatments <- read.csv("treatment.csv")%>% 
   complete(Scientific_Name,Product_treated, R_Name) %>% 
   left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "R_Name")
 
@@ -718,7 +718,7 @@ server <- function(input, output, session) {
   
   summaryValues <- reactive({
     print("Generating Summary")
-     browser()
+    #browser()
     
     # prevent summary/suggested responses if inadequate sites selected
     if(is.null(input$origmonitoringsite)&
@@ -813,33 +813,57 @@ server <- function(input, output, session) {
       
       # get metabarcoding data for origin
       if(!is.null(input$origmetabarcodingsite)){
-        origin <- origin %>%
-          bind_rows(metabarcoding_filtered() %>%
-                      filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmetabarcodingsite)) %>%
-                      data.frame() %>%
-                      mutate(Species=gsub("\\."," ",Species)) %>%
-                      filter(Species %in% AIS$R_Name) %>%
-                      group_by(Species) %>%
-                      summarize(Presence = any(as.logical(Presence)))) %>%
-          group_by(Species) %>%
+        # origin <- origin %>%
+        #   bind_rows(metabarcoding_filtered() %>%
+        #               filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmetabarcodingsite)) %>%
+        #               data.frame() %>%
+        #               mutate(Species=gsub("\\.","_",Species)) %>%
+        #               filter(Species %in% AIS$R_Name) %>%
+        #               group_by(Species) %>%
+        #               summarize(Presence = any(as.logical(Presence)))) %>%
+        #   group_by(Species) %>%
+        #   summarize(Presence = any(as.logical(Presence)))
+        
+        origin <- origin%>%
+          bind_rows(metabarcoding_filtered()%>% filter(name=="Presence") %>% 
+          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
+          filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>% 
+          data.frame() %>% 
+          gather(key="Species",value="Presence",-StnLocation) %>% 
+          #mutate(Species=gsub("\\."," ",Species)) %>%
+          mutate(Species=gsub("\\.","_",Species)) %>% 
+          filter(Species %in% AIS$R_Name) %>% 
+          group_by(Species) %>% 
           summarize(Presence = any(as.logical(Presence)))
+          )
 
       }
-
+      
 
       # get metabarcoding data for destination
       if(!is.null(input$destmetabarcodingsite)){
         destination <- destination %>%
-          bind_rows(metabarcoding_filtered() %>%
-                      filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmetabarcodingsite)) %>%
-                      data.frame() %>%
-                      #mutate(Species=gsub("\\."," ",Species)) %>%
-                      mutate(Species=gsub("\\.","_",Species)) %>%
-                      filter(Species %in% AIS$R_Name) %>%
-                      group_by(Species) %>%
-                      summarize(Presence = any(as.logical(Presence)))) %>%
-          group_by(Species) %>%
-          summarize(Presence = any(as.logical(Presence)))
+          bind_rows( metabarcoding_filtered() %>% filter(name=="Presence") %>% 
+              dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
+              filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>% 
+              data.frame() %>% 
+              gather(key="Species",value="Presence",-StnLocation) %>% 
+              #mutate(Species=gsub("\\."," ",Species)) %>% 
+              mutate(Species=gsub("\\.","_",Species)) %>% 
+              filter(Species %in% AIS$R_Name) %>% 
+              group_by(Species) %>% 
+              summarize(Presence = any(as.logical(Presence)))
+            )
+          #   metabarcoding_filtered() %>%
+          #             filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmetabarcodingsite)) %>%
+          #             data.frame() %>%
+          #             #mutate(Species=gsub("\\."," ",Species)) %>%
+          #             mutate(Species=gsub("\\.","_",Species)) %>%
+          #             filter(Species %in% AIS$R_Name) %>%
+          #             group_by(Species) %>%
+          #             summarize(Presence = any(as.logical(Presence)))) %>%
+          # group_by(Species) %>%
+          # summarize(Presence = any(as.logical(Presence)))
       }
 
       summary <- full_join(origin,destination,by="Species",suffix=c(" (Origin)"," (Destination)")) %>% 
