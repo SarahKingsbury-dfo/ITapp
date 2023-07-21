@@ -61,7 +61,8 @@ AIS_meta<-read.csv("commonnames.csv")
 
 sp_treatments <- read.csv("treatment.csv")%>% 
   complete(Scientific_Name,Product_treated, R_Name) %>% 
-  left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "R_Name")
+  left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "R_Name")%>%
+  drop_na()
 
 sp_mitigation <- read.csv("mitigation.csv",stringsAsFactors = FALSE)
 
@@ -890,7 +891,7 @@ server <- function(input, output, session) {
   
   output$mitigation <- renderTable({
     summarymitigation <- summaryValues()
-     browser()
+     #browser()
      
     if(ncol(summarymitigation)>1){
       if(length(input$product)>0){
@@ -902,9 +903,9 @@ server <- function(input, output, session) {
           filter(`Risk Assessment`!="") %>%
           left_join(sp_treatments,by=c("Species"="R_Name")) %>%
           dplyr::select(-`Presence (Origin)`, -`Presence (Destination)`
-            #Species, Common_Name, Product_treated,`Risk Assessment`,Treatment_proposed
-            ) %>%
-          filter(Product_treated %in% input$product|is.na(Product_treated))
+          #Species, Common_Name, Product_treated,`Risk Assessment`,Treatment_proposed
+          ) %>%
+          dplyr::filter(Product_treated %in% input$product|is.na(Product_treated))
         
         # get common names from AIS if not available in sp_treatments
         if(any(is.na(summarymitigation$Common_Name))){
