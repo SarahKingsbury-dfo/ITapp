@@ -890,17 +890,20 @@ server <- function(input, output, session) {
   
   output$mitigation <- renderTable({
     summarymitigation <- summaryValues()
-     #browser()
+     browser()
      
     if(ncol(summarymitigation)>1){
       if(length(input$product)>0){
         summarymitigation <- summarymitigation %>% 
+          mutate(Species=gsub(" ", "_", Species))%>%
           mutate(`Risk Assessment` = if_else(`Presence (Origin)`,
                                              if_else(`Presence (Destination)`,"Low risk with mitigation","High risk"),
                                              "")) %>%
           filter(`Risk Assessment`!="") %>%
-          left_join(sp_treatments,by=c("Species"="R_Name")) %>% 
-          dplyr::select(Species, Common_Name, Product_treated,`Risk Assessment`,Treatment_proposed) %>% 
+          left_join(sp_treatments,by=c("Species"="R_Name")) %>%
+          dplyr::select(-`Presence (Origin)`, -`Presence (Destination)`
+            #Species, Common_Name, Product_treated,`Risk Assessment`,Treatment_proposed
+            ) %>%
           filter(Product_treated %in% input$product|is.na(Product_treated))
         
         # get common names from AIS if not available in sp_treatments
