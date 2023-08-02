@@ -32,6 +32,7 @@ species <- read.csv("commonnames.csv")
 searcharea <- c(NS$geometry,NB$geometry,PEI$geometry) %>% 
   st_combine() %>% 
   st_convex_hull() %>% 
+  st_sfc()%>%
   st_transform(equidist) %>% 
   st_buffer(100000) %>% 
   st_transform(proj)
@@ -64,13 +65,13 @@ incidental_occ <- occ(query=species$Scientific_Name,
                            name %in% c("Ostrea edulis (Linnaeus, 1767)","Ostrea edulis Linnaeus, 1758","Ostrea edulis") ~ "Ostrea_edulis",
                            name %in% c("Styela clava Herdman, 1881", "Styela clava") ~ "Styela_clava",
                            name %in% c("Diplosoma listerianum (Milne Edwards, 1841)", "Diplosoma listerianum") ~ "Diplosoma_listerianum",
-                           name %in% c("Ascidiella aspersa (Müller, 1776)","Ascidiella aspersa" ) ~ "Ascidiella_aspersa",
+                           name %in% c("Ascidiella aspersa (M?ller, 1776)","Ascidiella aspersa" ) ~ "Ascidiella_aspersa",
                            name %in% c( "Flustra membranacea Linnaeus, 1767", "Membranipora membranacea") ~ "Membranipora_membranacea",
                            TRUE ~ name),
          Year=as.numeric(substr(date,1,4)))
 
-if(!all(sort(unique(incidental_occ$Species)) %in% sort(species$Scientific_Name))){
-  sp <- sort(unique(incidental_occ$Species))[!sort(unique(incidental_occ$Species)) %in% sort(species$Scientific_Name)]
+if(!all(sort(unique(incidental_occ$Species)) %in% sort(species$R_Name))){
+  sp <- sort(unique(incidental_occ$Species))[!sort(unique(incidental_occ$Species)) %in% sort(species$R_Name)]
   warning(paste0(sp," is not found in a recognized species name, rename in `incidental_occ` which is in `prepare_data.R`"))
 }
 
@@ -373,10 +374,18 @@ maritimes <- st_read("spatialdata/GSHHS_shp/f/GSHHS_f_L1.shp") %>%
 source("functions.R")
 
 #### set up transition matrix ####
+# library(raster)
+# library(sp)
 
 print("Setting up transition matrix")
-r <- raster(maritimes ,
-            ext=extent(st_bbox(searcharea %>% st_transform(equidist))),
+# searchbox<-extent(st_bbox(searcharea %>% st_transform(equidist)))
+r <- raster(maritimes,
+            # xmn=628730, #issue with extent and x and y values for min/max. 
+            # xmx=1374056 , #Maritimes polygon is cropped to the box extent above, therefore, no need to repeat the operation here.
+            # ymn=603784.7,
+            # ymx=1311254,
+            #ext=searchbox,
+            #ext=extent(st_bbox(searcharea %>% st_transform(equidist))),
             res = 1000)
 r <- fasterize(maritimes, r)
 r@data@values[r@data@values==1] <- 1
