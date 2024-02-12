@@ -2,6 +2,7 @@ if(!require("spocc")) install.packages("spocc")
 if(!require("robis")) install.packages("robis")
 if(!require("devtools")) install.packages("devtools")
 if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
+if(!require("arcpullr")) devtools::install_github("pfrater/arcpullr")
 if(!require("sf")) install.packages("sf")
 if(!require("raster")) install.packages("raster")
 if(!require("fasterize")) install.packages("fasterize")
@@ -50,14 +51,14 @@ incidental_occ <- occ(query=species$Scientific_Name,
   mutate(link=case_when(prov=="gbif" ~ paste0("https://www.gbif.org/occurrence/",key),
                         prov=="inat" ~ paste0("https://www.inaturalist.org/observations/",key)
   )) %>%
-  mutate(Species=case_when(name %in% c("Aequipecten irradians (Lamarck, 1819)","Argopecten irradians (Lamarck, 1819)", "Argopecten irradians") ~ "Argopecten_irradians",
+  mutate(Species=case_when(name %in% c("Aequipecten irradians (Lamarck, 1819)","Argopecten irradians (Lamarck, 1819)", "Argopecten irradians", "Argopecten irradians irradians", "Aequipecten irradians sablensis A.H.Clarke, 1965" ,"Argopecten irradians sablensis (A.H.Clarke, 1965)") ~ "Argopecten_irradians",
                            name %in% c("Ascidiella aspersa (Müller, 1776)") ~ "Ascidiella_aspersa",
                            name %in% c("BOLD:AAA7687","BOLD:ACL8382","Carcinus maenas (Linnaeus, 1758)", "Carcinus maenas") ~ "Carcinus_maenas",
                            name %in% c("Botrylloides violaceus Oka, 1927", "Botrylloides violaceus") ~ "Botrylloides_violaceus",
                            name %in% c("Botryllus schlosseri (Pallas, 1766)", "Botryllus schlosseri") ~ "Botryllus_schlosseri",
                            name %in% c("Caprella mutica Schurin, 1935","BOLD:AAE7686", "Caprella mutica") ~ "Caprella_mutica",
                            name %in% c("Ciona intestinalis (Linnaeus, 1767)","Ciona intestinalis tenella (Stimpson, 1852)","Ciona tenella (Stimpson, 1852)", "Ciona intestinalis" ) ~ "Ciona_intestinalis",
-                           name %in% c("Codium fragile (Suringar) Hariot","Codium fragile subsp. fragile","Codium fragile subsp. tomentosoides (Goor) P.C.Silva","Codium fragile tomentosoides", "Codium fragile" ) ~ "Codium_fragile",
+                           name %in% c("Codium fragile (Suringar) Hariot","Codium fragile subsp. fragile","Codium fragile subsp. tomentosoides (Goor) P.C.Silva","Codium fragile tomentosoides", "Codium fragile", "Codium fragile (Suringar) Har." ) ~ "Codium_fragile",
                            name %in% c("Didemnum vexillum Kott, 2002", "Didemnum vexillum") ~ "Didemnum_vexillum",
                            name %in% c("Hemigrapsus sanguineus (De Haan, 1835)","Hemigrapsus sanguineus (de Haan, 1835)", "Hemigrapsus sanguineus") ~ "Hemigrapsus_sanguineus",
                            name %in% c("Membranipora membranacea (Linnaeus, 1767)") ~ "Membranipora_membranacea",
@@ -145,8 +146,7 @@ gulf_tunicate_incidental_2021 <- readxl::read_excel("recentdata/Copy of P-A Tabl
 #   warning(paste0(sp," is not found in a recognized species name, rename in `gulf_tunicate_incidental` which is in `prepare_data.R`"))
 # }
 
-
-mar_incidental_2022<-read.csv("recentdata/Incidental_AIS_Reports_MAR.csv")%>%
+mar_incidental <- read.csv("recentdata/Incidental_AIS_Reports_MAR.csv")%>%
   sf::st_as_sf(coords=c('Lon','Lat'),crs=4326) %>% 
   filter(Picture_Confirmation==1) %>% 
   mutate(Presence=as.logical(Picture_Confirmation),
@@ -163,7 +163,7 @@ incidental_sites <- rbind(incidental_occ %>%
                             dplyr::select(StnLocation),
                           gulf_tunicate_incidental_2021%>% 
                             dplyr::select(StnLocation),
-                          mar_incidental_2022%>%
+                          mar_incidental%>%
                             dplyr::select(StnLocation))%>%
   group_by(StnLocation) %>% 
   summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
@@ -186,7 +186,7 @@ incidental <- bind_rows(incidental_occ %>%
                         gulf_tunicate_incidental_2021 %>%
                           mutate(across(.fns = as.character))%>%
                           as.data.table(),
-                        mar_incidental_2022%>%
+                        mar_incidental%>%
                           mutate(across(.fns=as.character))%>%
                           as.data.table()) %>% 
   unique() %>%
@@ -198,13 +198,13 @@ saveRDS(incidental_sites,"outputdata/incidental_sites.rds")
 saveRDS(incidental,"outputdata/incidental.rds")
 
 #Genomics Data
-metabarcode_2021<-read.csv("recentdata/metbarcoding_sites_2021.csv")%>%
+metabarcode<-read.csv("recentdata/metbarcoding_MAR.csv")%>%
   st_as_sf(coords=c("longitude","latitude"),crs=4326)%>%
   st_transform(proj)%>%
-  dplyr::select(-sample_name)
+  dplyr::select(-sample_name, -LAB)
 
 
-metabarcoding_sites<-metabarcode_2021%>% 
+metabarcoding_sites<-metabarcode%>% 
     group_by(StnLocation) %>% 
     summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
     unique() %>% 
@@ -215,30 +215,52 @@ metabarcoding_sites<-metabarcode_2021%>%
     st_transform(proj)
   
 saveRDS(metabarcoding_sites, "outputdata/metabarcoding_sites.rds")
-saveRDS(metabarcode_2021, "outputdata/metabarcoding.rds")
+saveRDS(metabarcode, "outputdata/metabarcoding.rds")
 
 # Load and clean up monitoring data ---------------------------------------
 
 # Maritimes Tunicates
 maritimes_tunicate_monitor <- rbind(
-  #esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/1"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/7"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/13"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/19"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/25"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/34"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/43"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/54"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/66"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/79"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/92"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/104"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/117"),
-                                    # esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/136"),
-                                    esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/Aquatic_Invasive_Species/MapServer/154"))%>%
-  dplyr::rename(geometry=geoms,Year = Year_Observed)%>% 
+  (lapply(2:9,function(x)
+     {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for A. aspersa
+     })%>%
+     bind_rows()),
+  (lapply(29:41,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for B. violaceus
+  })%>%
+    bind_rows()),
+  (lapply(67:80,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for B. schlosseri
+  })%>%
+    bind_rows()),
+  (lapply(106:113,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for C. mutica
+  })%>%
+    bind_rows()),
+  (lapply(133:146,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for C. intestinalis
+  })%>%
+    bind_rows()),
+  (lapply(172:179,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for D. vexillum
+  })%>%
+    bind_rows()),
+  (lapply(199:206,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for D. listerianum
+  })%>%
+    bind_rows()),
+  (lapply(229:236,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for M. membranacea
+  })%>%
+    bind_rows()),
+  (lapply(256:263,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for S. clava
+  })%>%
+    bind_rows())
+  )%>%
+  dplyr::rename(geometry=geoms,Year = year, StnLocation=stn_location)%>% 
   st_transform(proj) %>% 
-  dplyr::select(-OBJECTID,-Latitude,-Longitude,-FCName,-Prov,-sampler,-StnDescription,-StructureType,-StnNum)
+  dplyr::select(-OBJECTID,-latitude,-longitude,-cover_index,-province,-stn_num)
 
 
 maritimes_tunicate_2020 <- read.csv("recentdata/AIS_2020_present_absent.csv")%>% 
@@ -259,6 +281,12 @@ st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
   st_transform(proj)%>%
   dplyr::select(-StnNum) %>%
   mutate(Year=2022)
+
+maritimes_tunicate_2023<-read.csv("recentdata/MAR_Final_AIS_2023_present_absent_Dec7th_23.csv")%>%
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
+  st_transform(proj)%>%
+  dplyr::select(-StnNum) %>%
+  mutate(Year=2023)
 
 # Gulf Tunicates
 # gulf_tunicate_monitor <- esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Gulf_Region_Aquatic_Invasive_Species_Data/MapServer/0")
@@ -296,13 +324,17 @@ gulf_tunicate_monitor_2022 <- readxl::read_excel("recentdata/Copy of 2022 P-A Da
   mutate(Year=2022)
 
 
-monitoring_sites <- rbind(maritimes_tunicate_2020 %>% 
+monitoring_sites <- rbind(maritimes_tunicate_monitor%>% #from website
+                            dplyr::select(StnLocation), 
+                          maritimes_tunicate_2020 %>% #from raw csv files
                             dplyr::select(StnLocation),
                           maritimes_tunicate_2021 %>% 
                             dplyr::select(StnLocation),
                           maritimes_tunicate_monitor %>% 
                             dplyr::select(StnLocation),
                           maritimes_tunicate_2022%>%
+                            dplyr::select(StnLocation),
+                          maritimes_tunicate_2023%>%
                             dplyr::select(StnLocation),
                           gulf_tunicate_monitor_2020 %>% 
                             dplyr::select(StnLocation),
@@ -321,13 +353,17 @@ monitoring_sites <- rbind(maritimes_tunicate_2020 %>%
            lengths()>0) %>% 
   st_transform(proj)
 
-monitoring <- bind_rows(maritimes_tunicate_2020 %>% 
+monitoring <- bind_rows(maritimes_tunicate_monitor%>%
+                          as.data.table(),
+                          maritimes_tunicate_2020 %>% 
                           as.data.table(),
                         maritimes_tunicate_2021 %>% 
                           as.data.table(),
                         maritimes_tunicate_monitor %>%
                           as.data.table(),
                         maritimes_tunicate_2022 %>%
+                          as.data.table(),
+                        maritimes_tunicate_2023 %>%
                           as.data.table(),
                         gulf_tunicate_monitor_2020 %>% 
                           as.data.table(),
