@@ -164,7 +164,8 @@ incidental_sites <- rbind(incidental_occ %>%
                           gulf_tunicate_incidental_2021%>% 
                             dplyr::select(StnLocation),
                           mar_incidental%>%
-                            dplyr::select(StnLocation))%>%
+                            dplyr::select(StnLocation)
+                          )%>%
   group_by(StnLocation) %>% 
   summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
   unique() %>% 
@@ -188,7 +189,8 @@ incidental <- bind_rows(incidental_occ %>%
                           as.data.table(),
                         mar_incidental%>%
                           mutate(across(.fns=as.character))%>%
-                          as.data.table()) %>% 
+                          as.data.table()
+                        ) %>% 
   unique() %>%
   dplyr::select(Species,StnLocation,Year,prov,link) %>% 
   right_join(incidental_sites,by = "StnLocation") %>% 
@@ -434,12 +436,17 @@ saveRDS(tr,"outputdata/transition.rds")
 #### NS vs  incidentals and monitoring and metabarcoding ####
 
 print("Calculating in water distances for NS")
-ns_incidental_dist <- do.call(rbind,(lapply(NS$geometry %>%
-                                              st_transform(equidist),
-                                            function(x) inwaterdistance(incidental_sites %>%
-                                                                          st_transform(equidist),
-                                                                        x,
-                                                                        tr))))
+ns_incidental_dist <- do.call(rbind,
+                              (lapply(NS$geometry %>%
+                                        st_transform(equidist),
+                                      function(x) inwaterdistance(
+                                        incidental_sites %>% st_transform(equidist),
+                                                                  x,
+                                                                  tr)
+                              )
+                              )
+)
+
 row.names(ns_incidental_dist) <- NS$Lease_Identifier
 colnames(ns_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(ns_incidental_dist,"outputdata/ns_incidental_dist.rds")
@@ -512,6 +519,7 @@ pei_incidental_dist <- do.call(rbind,(lapply(PEI$geometry %>%
 row.names(pei_incidental_dist) <- PEI$Lease_Identifier
 colnames(pei_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(pei_incidental_dist,"outputdata/pei_incidental_dist.rds")
+
 pei_monitoring_dist <- do.call(rbind,(lapply(PEI$geometry %>%
                                                st_transform(equidist),
                                              function(x) inwaterdistance(monitoring_sites %>%
