@@ -436,16 +436,12 @@ saveRDS(tr,"outputdata/transition.rds")
 #### NS vs  incidentals and monitoring and metabarcoding ####
 
 print("Calculating in water distances for NS")
-ns_incidental_dist <- do.call(rbind,
-                              (lapply(NS$geometry %>%
+ns_incidental_dist <- do.call(rbind,(lapply(NS$geometry %>%
                                         st_transform(equidist),
-                                      function(x) inwaterdistance(
-                                        incidental_sites %>% st_transform(equidist),
+                                      function(x) inwaterdistance(incidental_sites %>% 
+                                                                    st_transform(equidist),
                                                                   x,
-                                                                  tr)
-                              )
-                              )
-)
+                                                                  tr))))
 
 row.names(ns_incidental_dist) <- NS$Lease_Identifier
 colnames(ns_incidental_dist) <- incidental_sites$StnLocation
