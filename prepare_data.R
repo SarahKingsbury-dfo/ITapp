@@ -77,14 +77,21 @@ if(!all(sort(unique(incidental_occ$Species)) %in% sort(species$R_Name))){
 }
 
 
-asian_shore_crab_2020 <- read.csv("recentdata/Asian_crab_2020_present_absent.csv")%>%
-  st_as_sf(coords=c('Long','Lat'),crs=4326) %>% 
-  filter(Presen_absent==1) %>% 
-  mutate(Species = "Hemigrapsus_sanguineus",
-         prov = paste("Maritimes Science Data:", Observer),
-         Year = 2020,
-         StnLocation = paste("ASC:", Site.Name)) %>% 
-  dplyr::select(Species,StnLocation,Year,prov)
+asian_shore_crab_2020 <- rbind(arcpullr::get_spatial_layer("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/225"),
+                               arcpullr::get_spatial_layer("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/226") )%>%
+  dplyr::rename(geometry=geoms, StnLocation=stn_location)%>% 
+  st_transform(proj) %>% 
+  dplyr::select(-OBJECTID,-latitude,-longitude,-Region)%>%
+  dplyr::filter(Count>=1)
+
+  # read.csv("recentdata/Asian_crab_2020_present_absent.csv")%>%
+  # st_as_sf(coords=c('Long','Lat'),crs=4326) %>% 
+  # filter(Presen_absent==1) %>% 
+  # mutate(Species = "Hemigrapsus_sanguineus",
+  #        prov = paste("Maritimes Science Data:", Observer),
+  #        Year = 2020,
+  #        StnLocation = paste("ASC:", Site.Name)) %>% 
+  # dplyr::select(Species,StnLocation,Year,prov)
   
 
 gulf_tunicate_incidental_2020 <- readxl::read_excel("recentdata/Gulf AIS data_biof_monit_incidental_AISNCP MAR_April 2021.xlsx",sheet=2,col_types =  "text") %>%
@@ -141,6 +148,28 @@ gulf_tunicate_incidental_2021 <- readxl::read_excel("recentdata/Copy of P-A Tabl
   mutate(prov="Gulf Science Data contact Renee.Bernier@dfo-mpo.gc.ca") %>% 
   st_cast('POINT')
 
+gulf_tunicate_incidental_2023<-readxl::read_excel("recentdata/Gulf_incidental_new detections_2023.xlsx",col_types =  "text") %>% 
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
+  dplyr::rename(StnLocation=Location,
+                "Botryllus_schlosseri"="B schlosseri",
+                "Botrylloides_violaceus"="B violaceus",
+                "Ciona_intestinalis"="C intestinalis",
+                "Styela_clava"="S clava",
+                #"Caprella_mutica"="C mutica",
+                #"Membranipora_membranacea"="M membranacea", 
+                "Carcinus_maenas"="C maenas",
+                "Codium_fragile"="C fragile") %>% 
+  dplyr::select(-Province,-Comments) %>% 
+  gather(key = "Species", value = "Presence",-StnLocation,-Year,-geometry) %>% 
+  group_by(Species,StnLocation,Year) %>% 
+  summarize(Presence = if_else(all(is.na(Presence)),
+                               FALSE,
+                               any(Presence>0,na.rm = TRUE))) %>% 
+  ungroup() %>% 
+  filter(Presence) %>% 
+  mutate(prov="Gulf Science Data contact Renee.Bernier@dfo-mpo.gc.ca") %>% 
+  st_cast('POINT')
+
 # if(!all(sort(unique(gulf_tunicate_incidental_2020$Species)) %in% sort(species$Scientific_Name))){
 #   sp <- sort(unique(gulf_tunicate_incidental_2020$Species))[!sort(unique(gulf_tunicate_incidental_2020$Species)) %in% sort(species$Scientific_Name)]
 #   warning(paste0(sp," is not found in a recognized species name, rename in `gulf_tunicate_incidental` which is in `prepare_data.R`"))
@@ -155,46 +184,55 @@ mar_incidental <- read.csv("recentdata/Incidental_AIS_Reports_MAR.csv")%>%
          ) %>% 
   dplyr::select(Species,StnLocation,Year,prov)
 
-incidental_sites <- rbind(incidental_occ %>% 
-                            dplyr::select(StnLocation),
-                          asian_shore_crab_2020 %>% 
-                            dplyr::select(StnLocation),
-                          gulf_tunicate_incidental_2020 %>% 
-                            dplyr::select(StnLocation),
-                          gulf_tunicate_incidental_2021%>% 
-                            dplyr::select(StnLocation),
-                          mar_incidental%>%
-                            dplyr::select(StnLocation)
-                          )%>%
-  group_by(StnLocation) %>% 
-  summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
+incidental_sites <- rbind(
+  # incidental_occ %>% 
+  #                           dplyr::select(StnLocation),
+  asian_shore_crab_2020 %>% 
+    dplyr::select(StnLocation),
+  gulf_tunicate_incidental_2020 %>% 
+    dplyr::select(StnLocation),
+  gulf_tunicate_incidental_2021%>% 
+    dplyr::select(StnLocation),
+  gulf_tunicate_incidental_2023%>% 
+    dplyr::select(StnLocation),
+  mar_incidental%>%
+    dplyr::select(StnLocation)
+)%>%
+  #na.omit()%>%
+  dplyr::group_by(StnLocation) %>% 
+  dplyr::summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
   unique() %>% 
-  st_transform(equidist) %>% 
-  filter(geometry%>% 
-           st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
-           lengths()>0) %>% 
-  st_transform(proj)
+  sf::st_transform(equidist) %>% 
+  dplyr::filter(geometry%>% 
+                  st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
+                  lengths()>0) %>% 
+  sf::st_transform(proj)
 
-incidental <- bind_rows(incidental_occ %>%
-                          mutate(across(.fns = as.character))%>%
-                          as.data.table(),
-                        asian_shore_crab_2020 %>%
-                          mutate(across(.fns = as.character))%>%
-                          as.data.table(),
-                        gulf_tunicate_incidental_2020 %>%
-                          mutate(across(.fns = as.character))%>%
-                          as.data.table(),
-                        gulf_tunicate_incidental_2021 %>%
-                          mutate(across(.fns = as.character))%>%
-                          as.data.table(),
-                        mar_incidental%>%
-                          mutate(across(.fns=as.character))%>%
-                          as.data.table()
-                        ) %>% 
+incidental <-  dplyr::bind_rows(
+  # incidental_occ %>%
+  #                         mutate(across(.fns = as.character))%>%
+  #                         as.data.table(),
+  asian_shore_crab_2020 %>%
+    dplyr::mutate(across(.fns = as.character))%>%
+    as.data.table(),
+  gulf_tunicate_incidental_2020 %>%
+    dplyr::mutate(across(.fns = as.character))%>%
+    as.data.table(),
+  gulf_tunicate_incidental_2021 %>%
+    dplyr::mutate(across(.fns = as.character))%>%
+    as.data.table(),
+  gulf_tunicate_incidental_2023 %>%
+    dplyr::mutate(across(.fns = as.character))%>%
+    as.data.table(),
+  mar_incidental%>%
+    dplyr::mutate(across(.fns=as.character))%>%
+    as.data.table()
+) %>% 
   unique() %>%
-  dplyr::select(Species,StnLocation,Year,prov,link) %>% 
-  right_join(incidental_sites,by = "StnLocation") %>% 
-  st_sf()
+  dplyr::select(Species,StnLocation,Year,prov) %>% 
+  dplyr::right_join(incidental_sites,by = "StnLocation") %>% 
+  st_sf()%>%
+  na.omit()
 
 saveRDS(incidental_sites,"outputdata/incidental_sites.rds")
 saveRDS(incidental,"outputdata/incidental.rds")
@@ -412,8 +450,8 @@ maritimes <- st_read("spatialdata/GSHHS_shp/f/GSHHS_f_L1.shp") %>%
 source("functions.R")
 
 #### set up transition matrix ####
-# library(raster)
-# library(sp)
+library(raster)
+library(sp)
 
 print("Setting up transition matrix")
 # searchbox<-extent(st_bbox(searcharea %>% st_transform(equidist)))
@@ -437,12 +475,12 @@ saveRDS(tr,"outputdata/transition.rds")
 
 print("Calculating in water distances for NS")
 ns_incidental_dist <- do.call(rbind,(lapply(NS$geometry %>%
-                                        st_transform(equidist),
-                                      function(x) inwaterdistance(incidental_sites %>% 
-                                                                    st_transform(equidist),
-                                                                  x,
-                                                                  tr))))
-
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(incidental_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
+                                      
 row.names(ns_incidental_dist) <- NS$Lease_Identifier
 colnames(ns_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(ns_incidental_dist,"outputdata/ns_incidental_dist.rds")
