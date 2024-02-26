@@ -62,7 +62,7 @@ AIS_meta<-read.csv("commonnames.csv")
 sp_treatments <- read.csv("treatment.csv")%>% 
   complete(Scientific_Name,Product_treated, R_Name) %>% 
   left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "R_Name")%>%
-  drop_na()
+  tidyr::drop_na()
 
 sp_mitigation <- read.csv("mitigation.csv",stringsAsFactors = FALSE)
 
@@ -281,14 +281,14 @@ server <- function(input, output, session) {
       dplyr::select(-geometry) %>% 
       group_by(Species,StnLocation) %>% 
       summarize(Presence = TRUE,
-                link=if_else(all(is.na(link)),
-                             "NA",
-                             paste0('<a href = "',unique(link),'"> ',Species,' </a>',collapse=" ")),
+                # link=if_else(all(is.na(link)),
+                #              "NA",
+                #              paste0('<a href = "',unique(link),'"> ',Species,' </a>',collapse=" ")),
                 prov = paste(unique(prov))) %>% 
       ungroup() %>% 
-      mutate(link=if_else(link=="NA",
-                          prov,
-                          link)) %>% 
+      # mutate(link=if_else(link=="NA",
+      #                     prov,
+      #                     link)) %>% 
       left_join(incidental_sites,by = "StnLocation")
     
     

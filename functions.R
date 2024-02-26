@@ -167,8 +167,9 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
     addPolygons(popup = paste("Lease:",leases$Lease_Identifier),group = "Leases") %>%
     addMarkers(data=incidentals$geometry,
                icon = IncidentalIcons[as.numeric(factor(incidentals$Species,levels=sort(monitoringsp)))],
-               group = incidentals$Species,
-               popup = incidentals$link) %>%
+               group = incidentals$Species
+               #popup = incidentals$link
+               ) %>%
     # addMinicharts(st_coordinates(metabarcoding$geometry)[,1],
     #               st_coordinates(metabarcoding$geometry)[,2],
     #               type="pie",
