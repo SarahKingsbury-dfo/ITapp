@@ -57,10 +57,12 @@ PEI <- readRDS("spatialdata/PEI.rds")
 
 
 AIS <- read.csv("commonnames.csv")
+AIS_meta<-read.csv("commonnames.csv")
 
-sp_treatments <- read.csv("treatment.csv",stringsAsFactors = FALSE)%>% 
-  complete(Scientific_Name,Product_treated) %>% 
-  left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "Scientific_Name")
+sp_treatments <- read.csv("treatment.csv")%>% 
+  complete(Scientific_Name,Product_treated, R_Name) %>% 
+  left_join(read.csv("commonnames.csv",stringsAsFactors = FALSE),by = "R_Name")%>%
+  tidyr::drop_na()
 
 sp_mitigation <- read.csv("mitigation.csv",stringsAsFactors = FALSE)
 
@@ -75,13 +77,17 @@ incidental_sites <- readRDS("outputdata/incidental_sites.rds")
 incidental <- readRDS("outputdata/incidental.rds")
 monitoring_sites <- readRDS("outputdata/monitoring_sites.rds")
 monitoring <- readRDS("outputdata/monitoring.rds")
-
+metabarcoding_sites<-readRDS("outputdata/metabarcoding_sites.rds")
+metabarcoding<-readRDS("outputdata/metabarcoding.rds")
 ns_incidental_dist <- readRDS("outputdata/ns_incidental_dist.rds")
 ns_monitoring_dist <- readRDS("outputdata/ns_monitoring_dist.rds")
+ns_metabarcoding_dist<-readRDS("outputdata/ns_metabarcoding_dist.rds")
 nb_incidental_dist <- readRDS("outputdata/nb_incidental_dist.rds")
 nb_monitoring_dist <- readRDS("outputdata/nb_monitoring_dist.rds")
+nb_metabarcoding_dist<-readRDS("outputdata/nb_metabarcoding_dist.rds")
 pei_incidental_dist <- readRDS("outputdata/pei_incidental_dist.rds")
 pei_monitoring_dist <- readRDS("outputdata/pei_monitoring_dist.rds")
+pei_metabarcoding_dist<-readRDS("outputdata/pei_metabarcoding_dist.rds")
 
 greenCrabIcon <- makeIcon(
   iconUrl = "GreenCrab.png",
@@ -114,11 +120,17 @@ ui <- navbarPage(
                numericInput(inputId = "origincidentalnum",
                          label = "Number of Incidental Observation Sites",
                          value = 5),
+               numericInput(inputId = "origmetabarcodingnum",
+                            label = "Number of Metabarcoding Sites",
+                            value = 2),
                checkboxGroupInput(inputId = "origmonitoringsite",
                                   label = "Biofouling Monitoring Sites to Include",
                                   choices = "temp"),
                checkboxGroupInput(inputId = "origincidentalsite",
                                   label = "Incidental Observation Sites to Include",
+                                  choices = "temp"),
+               checkboxGroupInput(inputId = "origmetabarcodingsite",
+                                  label = "Metabarcoding Sites to Include",
                                   choices = "temp")
              ),
              
@@ -146,11 +158,17 @@ ui <- navbarPage(
                numericInput(inputId = "destincidentalnum",
                          label = "Number of Incidental Observation Sites",
                          value = 3),
+               numericInput(inputId = "destmetabarcodingnum",
+                            label = "Number of Metabarcoding Sites",
+                            value = 3),
                checkboxGroupInput(inputId = "destmonitoringsite",
                                   label = "Biofouling Monitoring Sites to Include",
                                   choices = "temp"),
                checkboxGroupInput(inputId = "destincidentalsite",
                                   label = "Incidental Observation Sites to Include",
+                                  choices = "temp"),
+               checkboxGroupInput(inputId = "destmetabarcodingsite",
+                                  label = "Metabarcoding Sites to Include",
                                   choices = "temp")
              ),
              
@@ -203,7 +221,13 @@ ui <- navbarPage(
                         value = 3),
            numericInput(inputId = "incidentalyear",
                         label = "Ignore incidental observation records older than:",
-                        value = 1900) 
+                        value = 1900),
+           numericInput(inputId = "metabarcodingyear",
+                        label = "Ignore metabarcoding records older than:",
+                        value = 1900),
+           numericInput(inputId = "metabarcodingstrikes",
+                        label = "Number of non-detection records required to reverse a detection (i.e. when is an AIS considered 'failed to establish'):",
+                        value = 3)
   ),
   
   tabPanel("Read Me",
@@ -219,8 +243,9 @@ server <- function(input, output, session) {
   
   # reactive functions that filter data
   monitoring_filtered <- reactive({
+    #browser()
     monitoring %>% 
-      filter(Year>=input$monitoringyear) %>% 
+      dplyr::filter(Year>=input$monitoringyear) %>% 
       as.data.table() %>% 
       dplyr::select(-geometry) %>% 
       gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
@@ -241,10 +266,9 @@ server <- function(input, output, session) {
                                    any(Presence>0,na.rm = TRUE))
         ) %>% 
       ungroup() %>% 
-      mutate(Species=gsub("_"," ",Species),
-             Presence=as.character(Presence)) %>% 
-      pivot_longer(cols = c(Presence,History)) %>% 
-      pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
+      mutate(Presence=as.character(Presence)) %>%  
+      tidyr::pivot_longer(cols = c(Presence,History)) %>% 
+      tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
       inner_join(monitoring_sites,by = "StnLocation")
   })
   
@@ -257,15 +281,49 @@ server <- function(input, output, session) {
       dplyr::select(-geometry) %>% 
       group_by(Species,StnLocation) %>% 
       summarize(Presence = TRUE,
-                link=if_else(all(is.na(link)),
-                             "NA",
-                             paste0('<a href = "',unique(link),'"> ',Species,' </a>',collapse=" ")),
+                # link=if_else(all(is.na(link)),
+                #              "NA",
+                #              paste0('<a href = "',unique(link),'"> ',Species,' </a>',collapse=" ")),
                 prov = paste(unique(prov))) %>% 
       ungroup() %>% 
-      mutate(link=if_else(link=="NA",
-                          prov,
-                          link)) %>% 
+      # mutate(link=if_else(link=="NA",
+      #                     prov,
+      #                     link)) %>% 
       left_join(incidental_sites,by = "StnLocation")
+    
+    
+  })
+  
+  metabarcoding_filtered <- reactive({
+     #browser()
+    metabarcoding %>%
+      filter(Year>=input$metabarcodingyear) %>%
+      as.data.table() %>%
+      dplyr::select(-geometry) %>%
+      gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
+      group_by(Species,StnLocation) %>% 
+      summarize(
+        History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
+                          length(Year)>input$metabarcodingstrikes&all(!tail(Presence,input$metabarcodingstrikes)) ~ paste0("Likely failed to establish, detected in: ",
+                                                                                                                     paste(Year[Presence],collapse = ", "),
+                                                                                                                     ", and not detected in: ",
+                                                                                                                     paste(Year[!Presence],collapse = ", ")),
+                          any(!Presence)~paste0("Detected in: ",
+                                                paste(Year[Presence],collapse = ", "),
+                                                ", and not detected in: ",
+                                                paste(Year[!Presence],collapse = ", ")),
+                          TRUE~paste("Detected in",paste(Year,collapse = ","))),
+        Presence = if_else(all(is.na(Presence)),
+                           FALSE,
+                           any(Presence>0,na.rm = TRUE))
+      ) %>% 
+      ungroup()%>%
+      mutate(prov=paste("Metabarcoding Results"),
+             Presence=as.character(Presence)) %>%
+      tidyr::pivot_longer(cols = c(Presence,History)) %>% 
+      tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
+      left_join(metabarcoding_sites,by = "StnLocation")
+
   })
 
   
@@ -275,10 +333,13 @@ server <- function(input, output, session) {
   # functions for updating UI
   
   update_orig_sites <- function(lease,prov){
+   # browser()
+
     if(input$origmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                         prov,
-                                        monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                        monitoring_filtered() %>% filter(name=="Presence") %>% 
+                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
                                         as.numeric(input$origmonitoringnum),
                                         monitoring_dist_orig())
       
@@ -300,13 +361,30 @@ server <- function(input, output, session) {
                                "origincidentalsite",
                                choices = nearestincidental$StnLocation)
     }
+    
+    if(input$origmetabarcodingnum!=""){
+      nearestmetabarcoding <- nearestsites(lease,
+                                        prov,
+                                        metabarcoding_filtered() %>% filter(name=="Presence")%>% 
+                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                        as.numeric(input$origmetabarcodingnum),
+                                        metabarcoding_dist_orig())
+
+      updateCheckboxGroupInput(session,
+                               "origmetabarcodingsite",
+                               choices = nearestmetabarcoding$StnLocation)
+    }
+    
   }
   
   update_dest_sites <- function(lease,prov){
+    #browser()
+    
     if(input$destmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                         prov,
-                                        monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                        monitoring_filtered() %>% filter(name=="Presence") %>% 
+                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
                                         as.numeric(input$destmonitoringnum),
                                         monitoring_dist_dest())
       
@@ -327,6 +405,19 @@ server <- function(input, output, session) {
       updateCheckboxGroupInput(session,
                                "destincidentalsite",
                                choices = nearestincidental$StnLocation)
+    }
+    
+    if(input$destmetabarcodingnum!=""){
+      nearestmetabarcoding <- nearestsites(lease,
+                                           prov,
+                                        metabarcoding_filtered() %>% filter(name=="Presence")%>% 
+                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                        as.numeric(input$destmetabarcodingnum),
+                                        metabarcoding_dist_dest())
+
+      updateCheckboxGroupInput(session,
+                               "destmetabarcodingsite",
+                               choices = nearestmetabarcoding$StnLocation)
     }
   }
   
@@ -377,6 +468,13 @@ server <- function(input, output, session) {
                       prov=origprovInput())
   })
   
+  # Origin - # of metabarcoding sites
+  observeEvent(input$origmetabarcodingnum, {
+    update_orig_sites(lease=origprovInput() %>%
+                        filter(Lease_Identifier==input$origlease),
+                      prov=origprovInput())
+  })
+  
   # Destination - choose a province 
   observeEvent(input$destprov, {
     #get provincial leases
@@ -415,7 +513,12 @@ server <- function(input, output, session) {
                         filter(Lease_Identifier==input$destlease),
                       prov=destprovInput())
   })
-  
+  # Destination - # of metabarcoding sites
+  observeEvent(input$destmetabarcodingnum, {
+    update_dest_sites(lease=destprovInput() %>%
+                        filter(Lease_Identifier==input$destlease),
+                      prov=destprovInput())
+  })
   
   
     
@@ -454,6 +557,13 @@ server <- function(input, output, session) {
            "PEI" = pei_incidental_dist)
   })
   
+  metabarcoding_dist_orig <- reactive({
+    switch(input$origprov,
+           "NS" = ns_metabarcoding_dist,
+           "NB"=nb_metabarcoding_dist,
+           "PEI"=pei_metabarcoding_dist)
+  })
+
   monitoring_dist_dest <- reactive({
     switch(input$destprov,
            "NS" = ns_monitoring_dist,
@@ -467,26 +577,42 @@ server <- function(input, output, session) {
            "NB" = nb_incidental_dist,
            "PEI" = pei_incidental_dist)
   })
+  
+  metabarcoding_dist_dest <- reactive({
+    switch(input$destprov,
+           "NS" = ns_metabarcoding_dist,
+           "NB" = nb_monitoring_dist,
+           "PEI" = pei_monitoring_dist)
+  })
   #### Leaflet maps ####
   
   # full interactive map
   output$leafletmap <- renderLeaflet({
+   # browser()
+    
     all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
                         dplyr::select(NB,Lease_Identifier),
                         dplyr::select(PEI,Lease_Identifier))
     basemap(leases=all_leases,
             incidentals=incidental_filtered(),
-            monitoring=monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
-            monitoringsp=AIS$Scientific_Name)
+            metabarcoding=metabarcoding_filtered()%>% filter(name=="Presence") %>% 
+              dplyr::select(-name) %>% 
+              mutate(across(2:(ncol(.)-1),as.logical)),
+            monitoring=monitoring_filtered() %>% filter(name=="Presence") %>% 
+              dplyr::select(-name) %>% 
+              mutate(across(2:(ncol(.)-1),as.logical)),
+            monitoringsp=AIS$R_Name,
+            metabarcodingsp=AIS_meta$R_Name)
   })
 
 
   # map for origin tab
   output$leafletorig <- renderLeaflet({
-    # browser()
+     #browser()
     print("making map")
     
     prov <- origprovInput()
+   
     
     if(!input$origlease %in% prov$Lease_Identifier){
       lease <- prov %>%
@@ -500,7 +626,8 @@ server <- function(input, output, session) {
     if(input$origmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                        prov,
-                                       monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                       monitoring_filtered() %>% filter(name=="Presence") %>% 
+                                         dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% mutate(across(2:(ncol(.)-1),as.logical)),
                                        as.numeric(input$origmonitoringnum),
                                        monitoring_dist_orig())
     }
@@ -512,13 +639,26 @@ server <- function(input, output, session) {
                                        as.numeric(input$origincidentalnum),
                                        incidental_dist_orig())
     }
+    
+    if(input$origmetabarcodingnum!=""){
+      nearestmetabarcoding <- nearestsites(lease,
+                                           prov,
+                                           metabarcoding_filtered()%>% filter(name=="Presence") %>% 
+                                             dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                           as.numeric(input$origmetabarcodingnum),
+                                           metabarcoding_dist_orig())
+    }
 
-    if(input$origincidentalnum!="" & input$origmonitoringnum!=""){
+    if(input$origincidentalnum!="" & input$origmonitoringnum!="" & input$origmetabarcodingnum!=""){
       basemap(leases=lease,
               incidentals=nearestincidental,
+              metabarcoding=nearestmetabarcoding,
               monitoring=nearestmonitoring,
-              monitoringsp=AIS$Scientific_Name)
+              monitoringsp=AIS$R_Name,
+              metabarcodingsp=AIS$R_Name)
     }
+    
+   
   })
 
   # map for destination tab
@@ -538,7 +678,8 @@ server <- function(input, output, session) {
     if(input$destmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                         prov,
-                                        monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                        monitoring_filtered() %>% filter(name=="Presence") %>% 
+                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
                                         as.numeric(input$destmonitoringnum),
                                         monitoring_dist_dest())
     }
@@ -551,12 +692,26 @@ server <- function(input, output, session) {
                                         incidental_dist_dest())
     }
     
-    if(input$destincidentalnum!="" & input$destmonitoringnum!=""){
+    if(input$destmetabarcodingnum!=""){
+      nearestmetabarcoding <- nearestsites(lease,
+                                        prov,
+                                        metabarcoding_filtered() %>% filter(name=="Presence") %>% 
+                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                       # metabarcoding_filtered(),
+                                        as.numeric(input$destmetabarcodingnum),
+                                        metabarcoding_dist_dest())
+    }
+    
+    if(input$destincidentalnum!="" & input$destmonitoringnum!="" & input$destmetabarcodingnum!=""){
       basemap(leases=lease,
               incidentals=nearestincidental,
+              metabarcoding=nearestmetabarcoding,
               monitoring=nearestmonitoring,
-              monitoringsp=AIS$Scientific_Name)
+              monitoringsp=AIS$R_Name,
+              metabarcodingsp=AIS_meta$R_Name)
     }
+
+ 
   })
   
   
@@ -564,35 +719,44 @@ server <- function(input, output, session) {
   
   summaryValues <- reactive({
     print("Generating Summary")
-    # browser()
+    #browser()
     
     # prevent summary/suggested responses if inadequate sites selected
     if(is.null(input$origmonitoringsite)&
        is.null(input$origincidentalsite)&
+       is.null(input$origmetabarcodingsite)&
        is.null(input$destmonitoringsite)&
-       is.null(input$destincidentalsite)){
+       is.null(input$destincidentalsite)&
+       is.null(input$destmetabarcodingsite)
+       ){
       summary <- data.frame(
         Site = "No biofouling monitoring sites or incidental observation sites were selected on the Origin or Destination tab"
       )
     } else if(is.null(input$origmonitoringsite)&
-              is.null(input$origincidentalsite)){
+              is.null(input$origincidentalsite)&
+              is.null(input$origmetabarcodingsite)
+              ){
       summary <- data.frame(
         Site = "No biofouling monitoring sites or incidental observation sites were selected on the Origin tab"
       )
     }else if(is.null(input$destmonitoringsite)&
-             is.null(input$destincidentalsite)){
+             is.null(input$destincidentalsite)&
+             is.null(input$destmetabarcodingsite)
+             ){
       summary <- data.frame(
         Site = "No biofouling monitoring sites or incidental observation sites were selected on the Destination tab"
       )
     } else {
       # get monitoring data for origin
       if(!is.null(input$origmonitoringsite)){
-        origin <- monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
+        origin <- monitoring_filtered() %>% filter(name=="Presence") %>% 
+          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
           filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>% 
           data.frame() %>% 
           gather(key="Species",value="Presence",-StnLocation) %>% 
-          mutate(Species=gsub("\\."," ",Species)) %>% 
-          filter(Species %in% AIS$Scientific_Name) %>% 
+          #mutate(Species=gsub("\\."," ",Species)) %>%
+          mutate(Species=gsub("\\.","_",Species)) %>% 
+          filter(Species %in% AIS$R_Name) %>% 
           group_by(Species) %>% 
           summarize(Presence = any(as.logical(Presence)))
       }else {
@@ -601,12 +765,14 @@ server <- function(input, output, session) {
       
       # get monitoring data for destination
       if(!is.null(input$destmonitoringsite)){  
-        destination <- monitoring_filtered() %>% filter(name=="Presence") %>% select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
+        destination <- monitoring_filtered() %>% filter(name=="Presence") %>% 
+          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
           filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>% 
           data.frame() %>% 
           gather(key="Species",value="Presence",-StnLocation) %>% 
-          mutate(Species=gsub("\\."," ",Species)) %>% 
-          filter(Species %in% AIS$Scientific_Name) %>% 
+          #mutate(Species=gsub("\\."," ",Species)) %>% 
+          mutate(Species=gsub("\\.","_",Species)) %>% 
+          filter(Species %in% AIS$R_Name) %>% 
           group_by(Species) %>% 
           summarize(Presence = any(as.logical(Presence)))
       } else {
@@ -620,8 +786,9 @@ server <- function(input, output, session) {
           bind_rows(incidental_filtered() %>% 
                       filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$origincidentalsite)) %>% 
                       data.frame() %>% 
-                      mutate(Species=gsub("\\."," ",Species)) %>% 
-                      filter(Species %in% AIS$Scientific_Name) %>% 
+                      #mutate(Species=gsub("\\."," ",Species)) %>% 
+                      mutate(Species=gsub("\\.","_",Species)) %>% 
+                      filter(Species %in% AIS$R_Name) %>% 
                       group_by(Species) %>% 
                       summarize(Presence = any(as.logical(Presence)))) %>% 
           group_by(Species) %>% 
@@ -636,14 +803,70 @@ server <- function(input, output, session) {
           bind_rows(incidental_filtered() %>% 
                       filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$destincidentalsite)) %>% 
                       data.frame() %>% 
-                      mutate(Species=gsub("\\."," ",Species)) %>% 
-                      filter(Species %in% AIS$Scientific_Name) %>% 
+                      #mutate(Species=gsub("\\."," ",Species)) %>% erased _ between species names
+                      mutate(Species=gsub("\\.","_",Species)) %>% 
+                      filter(Species %in% AIS$R_Name) %>% 
                       group_by(Species) %>% 
                       summarize(Presence = any(as.logical(Presence)))) %>% 
           group_by(Species) %>% 
           summarize(Presence = any(as.logical(Presence)))
       }
       
+      # get metabarcoding data for origin
+      if(!is.null(input$origmetabarcodingsite)){
+        # origin <- origin %>%
+        #   bind_rows(metabarcoding_filtered() %>%
+        #               filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmetabarcodingsite)) %>%
+        #               data.frame() %>%
+        #               mutate(Species=gsub("\\.","_",Species)) %>%
+        #               filter(Species %in% AIS$R_Name) %>%
+        #               group_by(Species) %>%
+        #               summarize(Presence = any(as.logical(Presence)))) %>%
+        #   group_by(Species) %>%
+        #   summarize(Presence = any(as.logical(Presence)))
+        
+        origin <- origin%>%
+          bind_rows(metabarcoding_filtered()%>% filter(name=="Presence") %>% 
+          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
+          filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>% 
+          data.frame() %>% 
+          gather(key="Species",value="Presence",-StnLocation) %>% 
+          #mutate(Species=gsub("\\."," ",Species)) %>%
+          mutate(Species=gsub("\\.","_",Species)) %>% 
+          filter(Species %in% AIS$R_Name) %>% 
+          group_by(Species) %>% 
+          summarize(Presence = any(as.logical(Presence)))
+          )
+
+      }
+      
+
+      # get metabarcoding data for destination
+      if(!is.null(input$destmetabarcodingsite)){
+        destination <- destination %>%
+          bind_rows( metabarcoding_filtered() %>% filter(name=="Presence") %>% 
+              dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
+              filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>% 
+              data.frame() %>% 
+              gather(key="Species",value="Presence",-StnLocation) %>% 
+              #mutate(Species=gsub("\\."," ",Species)) %>% 
+              mutate(Species=gsub("\\.","_",Species)) %>% 
+              filter(Species %in% AIS$R_Name) %>% 
+              group_by(Species) %>% 
+              summarize(Presence = any(as.logical(Presence)))
+            )
+          #   metabarcoding_filtered() %>%
+          #             filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmetabarcodingsite)) %>%
+          #             data.frame() %>%
+          #             #mutate(Species=gsub("\\."," ",Species)) %>%
+          #             mutate(Species=gsub("\\.","_",Species)) %>%
+          #             filter(Species %in% AIS$R_Name) %>%
+          #             group_by(Species) %>%
+          #             summarize(Presence = any(as.logical(Presence)))) %>%
+          # group_by(Species) %>%
+          # summarize(Presence = any(as.logical(Presence)))
+      }
+
       summary <- full_join(origin,destination,by="Species",suffix=c(" (Origin)"," (Destination)")) %>% 
         replace_na(list(Species=NA,"Presence (Origin)"=FALSE,"Presence (Destination)"=FALSE)) %>% 
         mutate(Species = str_replace(Species,"_"," "))
@@ -668,23 +891,27 @@ server <- function(input, output, session) {
   
   output$mitigation <- renderTable({
     summarymitigation <- summaryValues()
-    # browser()
+     #browser()
+     
     if(ncol(summarymitigation)>1){
       if(length(input$product)>0){
         summarymitigation <- summarymitigation %>% 
+          mutate(Species=gsub(" ", "_", Species))%>%
           mutate(`Risk Assessment` = if_else(`Presence (Origin)`,
                                              if_else(`Presence (Destination)`,"Low risk with mitigation","High risk"),
                                              "")) %>%
           filter(`Risk Assessment`!="") %>%
-          left_join(sp_treatments,by=c("Species"="Scientific_Name")) %>% 
-          dplyr::select(Species, Common_Name, Product_treated,`Risk Assessment`,Treatment_proposed) %>% 
-          filter(Product_treated %in% input$product|is.na(Product_treated))
+          left_join(sp_treatments,by=c("Species"="R_Name")) %>%
+          dplyr::select(-`Presence (Origin)`, -`Presence (Destination)`
+          #Species, Common_Name, Product_treated,`Risk Assessment`,Treatment_proposed
+          ) %>%
+          dplyr::filter(Product_treated %in% input$product|is.na(Product_treated))
         
         # get common names from AIS if not available in sp_treatments
         if(any(is.na(summarymitigation$Common_Name))){
           summarymitigation <- summarymitigation %>% 
-            select(-Common_Name) %>% 
-            left_join(AIS,by=c("Species"="Scientific_Name"))
+            dplyr::select(-Common_Name) %>% 
+            left_join(AIS,by=c("Species"="R_Name"))
         }
         
       } else {
@@ -699,7 +926,7 @@ server <- function(input, output, session) {
         summarymitigation <- data.frame(
           Site = sp_mitigation %>% 
             filter(Common_Name==input$product) %>% 
-            select(Mitigation) %>% 
+            dplyr::select(Mitigation) %>% 
             as.character()
         )
       } else{
@@ -713,7 +940,7 @@ server <- function(input, output, session) {
     if(!is.null(input$consideration)){
       if(all(input$consideration==c("Land-based origin","Land-based destination"))){
         summarymitigation <- data.frame(
-          Site = "The risk for AIS/FFHPP/SARP is considered low with high certainty because the origin and destination sites are land-based")
+          Site = "The risk for AIS/FFHPP/SARP is considered low with high certainty because the origin and destination sites are land-based. However, precautions should be taken to ensure no escapes or accidental introductions occur. It is recommended that all equipment used to capture, rear, hold, or transport the species  (and associated water used in transfer) should be cleaned, drained, dried, and decontaminated prior to use elsewhere. Approval of introduction & transfer requests do not preclude individuals from their responsibilities to ensure no introductions of non-indigenous species (including species that are common to Nova Scotia but from a different genetic strain) to areas they are not indigenous to as states under the Aquatic Invasive Species Regulations s. 10. ")
       } else if(input$consideration=="Land-based origin"){
         if(!input$product %in% sp_mitigation$Common_Name){
           summarymitigation <- data.frame(
@@ -722,7 +949,7 @@ server <- function(input, output, session) {
         
       } else if(input$consideration=="Land-based destination"){
         summarymitigation <- data.frame(
-          Site = "The risk for AIS/FFHPP/SARP is considered low with high certainty because the destination site is land-based")
+          Site = "The risk for AIS/FFHPP/SARP is considered low with high certainty because the destination site is land-based. However, precautions should be taken to ensure no escapes or accidental introductions occur. It is recommended that all equipment used to capture, rear, hold, or transport the species  (and associated water used in transfer) should be cleaned, drained, dried, and decontaminated prior to use elsewhere. Approval of introduction & transfer requests do not preclude individuals from their responsibilities to ensure no introductions of non-indigenous species (including species that are common to Nova Scotia but from a different genetic strain) to areas they are not indigenous to as states under the Aquatic Invasive Species Regulations s. 10. ")
       } else {
         summarymitigation <- data.frame(
           Site = "This (combination of) consideration(s) is not resolved in this app")
@@ -731,7 +958,7 @@ server <- function(input, output, session) {
     
     updateTextInput(inputId = "response",value = create_response(summitigation = summarymitigation, species = input$product))
     return(summarymitigation %>% 
-             setNames(gsub("_"," ",names(.))))
+             setNames(gsub("_"," ",names(.)))) 
     
   },
   caption.placement="top",
@@ -742,17 +969,19 @@ server <- function(input, output, session) {
     origin <- monitoring_filtered() %>%
       filter(name=="History"&gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>%
       data.frame() %>%
-      select(-StnLocation) %>% 
+      dplyr::select(-StnLocation) %>% 
       gather(key="Species",value="History") %>%
-      mutate(Species=gsub("\\."," ",Species)) %>%
-      filter(Species %in% AIS$Scientific_Name)
+     # mutate(Species=gsub("\\."," ",Species)) %>%
+      mutate(Species=gsub("\\.","_",Species)) %>%
+      filter(Species %in% AIS$R_Name)
     destination <- monitoring_filtered() %>%
       filter(name=="History"&gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>%
       data.frame()%>%
-      select(-StnLocation) %>% 
+      dplyr::select(-StnLocation) %>% 
       gather(key="Species",value="History") %>%
-      mutate(Species=gsub("\\."," ",Species)) %>%
-      filter(Species %in% AIS$Scientific_Name)
+     # mutate(Species=gsub("\\."," ",Species)) %>%
+      mutate(Species=gsub("\\.","_",Species)) %>%
+      filter(Species %in% AIS$R_Name)
     full_join(origin,destination,by="Species", suffix=c(" (Origin)"," (Destination)"))
   },
   caption.placement="top",
