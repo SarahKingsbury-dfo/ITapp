@@ -17,6 +17,7 @@ print("Warning: Initial installation will take multiple hours!")
 print("Loading data")
 proj <- "+proj=longlat +datum=WGS84"
 equidist <- "+proj=eqdc +lon_0=-63.59 +lat_1=43.92 +lat_2=48.33 +lat_0=46.13 +x_0=1000000 +y_0=1000000 +datum=WGS84 +units=m +no_defs"
+sf_use_s2(FALSE)
 
 
 
@@ -77,8 +78,8 @@ if(!all(sort(unique(incidental_occ$Species)) %in% sort(species$R_Name))){
 }
 
 
-asian_shore_crab_2020 <- rbind(arcpullr::get_spatial_layer("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/225"),
-                               arcpullr::get_spatial_layer("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/226") )%>%
+asian_shore_crab_2020 <- rbind(arcpullr::get_spatial_layer("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/226"),
+                               arcpullr::get_spatial_layer("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/227") )%>%
   dplyr::rename(geometry=geoms, StnLocation=stn_location)%>% 
   st_transform(proj) %>% 
   dplyr::select(-OBJECTID,-latitude,-longitude,-Region)%>%
@@ -265,35 +266,35 @@ maritimes_tunicate_monitor <- rbind(
      {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for A. aspersa
      })%>%
      bind_rows()),
-  (lapply(29:41,function(x)
+  (lapply(29:42,function(x)
   {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for B. violaceus
   })%>%
     bind_rows()),
-  (lapply(67:80,function(x)
+  (lapply(68:81,function(x)
   {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for B. schlosseri
   })%>%
     bind_rows()),
-  (lapply(106:113,function(x)
+  (lapply(107:114,function(x)
   {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for C. mutica
   })%>%
     bind_rows()),
-  (lapply(133:146,function(x)
+  (lapply(134:147,function(x)
   {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for C. intestinalis
   })%>%
     bind_rows()),
-  (lapply(172:179,function(x)
+  (lapply(173:180,function(x)
   {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for D. vexillum
   })%>%
     bind_rows()),
-  (lapply(199:206,function(x)
+  (lapply(200:207,function(x)
   {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for D. listerianum
   })%>%
     bind_rows()),
-  (lapply(229:236,function(x)
+  (lapply(230:237,function(x)
   {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for M. membranacea
   })%>%
     bind_rows()),
-  (lapply(256:263,function(x)
+  (lapply(257:264,function(x)
   {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for S. clava
   })%>%
     bind_rows())
@@ -451,6 +452,7 @@ source("functions.R")
 
 #### set up transition matrix ####
 library(raster)
+library(fasterize)
 library(sp)
 
 print("Setting up transition matrix")
