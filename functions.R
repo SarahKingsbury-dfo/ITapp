@@ -50,8 +50,8 @@ nearestsites <- function(lease,prov,sites,n,distmat){
 }
 
 #### basemap ####
-basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding, metabarcodingsp, ...){
-  
+basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
+ # metabarcoding, metabarcodingsp,
   #browser()
 
   IncidentalIcons <- iconList(
@@ -156,12 +156,12 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
   
  #browser()
   sp <- monitoringsp[monitoringsp %in% names(monitoring)]
-  sp_m<-metabarcoding%>%
-    dplyr::select(-StnLocation, -distance)%>%
-    tidyr::pivot_longer(!geometry, names_to="species", values_to="presence")%>%
-    dplyr::filter(presence=="TRUE")%>%
-    dplyr::select(species)
-  
+  # sp_m<-metabarcoding%>%
+  #   dplyr::select(-StnLocation, -distance)%>%
+  #   tidyr::pivot_longer(!geometry, names_to="species", values_to="presence")%>%
+  #   dplyr::filter(presence=="TRUE")%>%
+  #   dplyr::select(species)
+  # 
   leaflet(leases,...) %>%
     addTiles() %>%
     addPolygons(popup = paste("Lease:",leases$Lease_Identifier),group = "Leases") %>%
@@ -170,25 +170,6 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
                group = incidentals$Species
                #popup = incidentals$link
                ) %>%
-    # addMinicharts(st_coordinates(metabarcoding$geometry)[,1],
-    #               st_coordinates(metabarcoding$geometry)[,2],
-    #               type="pie",
-    #               chartdata=as.data.frame(metabarcoding)[,sp_m],
-    #               #colorPalette = colors,
-    #               legend=TRUE,
-    #               legendPosition = 'bottomright',
-    #               layerId = metabarcoding,
-    #               popupOptions = list(closeButton=FALSE, showTitle=TRUE),
-    #               ) %>%
-    addCircleMarkers(
-      data=metabarcoding$geometry,
-      color= "lightyellow",
-      weight=1,
-      group="metabarcoding",
-      label=paste("Presence Present:", "<br>",
-                  sp_m)%>%
-        lapply(htmltools::HTML),
-    )%>%
     addMinicharts(st_coordinates(monitoring$geometry)[,1],
                   st_coordinates(monitoring$geometry)[,2],
                   type="pie",
@@ -197,10 +178,28 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp, metabarcoding
                   #colorPalette = d3.schemeCategory10,
                   legend = TRUE,
                   legendPosition = 'topright') %>%
-    addLayersControl(overlayGroups = c("Leases",incidentals$Species, "metabarcoding"),
+    addLayersControl(overlayGroups = c("Leases",incidentals$Species),
                      options = layersControlOptions(collapsed = FALSE))
 }
 
+#### basemap eDNA ####
+basemap_eDNA <- function(leases, metabarcoding, metabarcodingsp,...){
+  
+  sp_eDNA <- metabarcodingsp[metabarcodingsp %in% names(metabarcoding)]
+  
+  leaflet(leases,...) %>%
+    addTiles() %>%
+    addPolygons(popup = paste("Lease:",leases$Lease_Identifier),group = "Leases") %>%
+    addMinicharts(st_coordinates(metabarcoding$geometry)[,1],
+                  st_coordinates(metabarcoding$geometry)[,2],
+                  type="pie",
+                  chartdata=as.data.frame(metabarcoding)[,sp_eDNA],
+                  legend = TRUE,
+                  legendPosition = 'topright') %>%
+    addLayersControl(overlayGroups = c("Leases"),
+                     options = layersControlOptions(collapsed = FALSE))
+  
+}
 
 create_response <- function(summitigation,species){
   if("Site" %in% names(summitigation)){

@@ -120,17 +120,11 @@ ui <- navbarPage(
                numericInput(inputId = "origincidentalnum",
                          label = "Number of Incidental Observation Sites",
                          value = 5),
-               numericInput(inputId = "origmetabarcodingnum",
-                            label = "Number of Metabarcoding Sites",
-                            value = 2),
                checkboxGroupInput(inputId = "origmonitoringsite",
                                   label = "Biofouling Monitoring Sites to Include",
                                   choices = "temp"),
                checkboxGroupInput(inputId = "origincidentalsite",
                                   label = "Incidental Observation Sites to Include",
-                                  choices = "temp"),
-               checkboxGroupInput(inputId = "origmetabarcodingsite",
-                                  label = "Metabarcoding Sites to Include",
                                   choices = "temp")
              ),
              
@@ -158,17 +152,11 @@ ui <- navbarPage(
                numericInput(inputId = "destincidentalnum",
                          label = "Number of Incidental Observation Sites",
                          value = 3),
-               numericInput(inputId = "destmetabarcodingnum",
-                            label = "Number of Metabarcoding Sites",
-                            value = 3),
                checkboxGroupInput(inputId = "destmonitoringsite",
                                   label = "Biofouling Monitoring Sites to Include",
                                   choices = "temp"),
                checkboxGroupInput(inputId = "destincidentalsite",
                                   label = "Incidental Observation Sites to Include",
-                                  choices = "temp"),
-               checkboxGroupInput(inputId = "destmetabarcodingsite",
-                                  label = "Metabarcoding Sites to Include",
                                   choices = "temp")
              ),
              
@@ -207,8 +195,14 @@ ui <- navbarPage(
   ),
   
   
-  tabPanel("Interactive Map",
+  tabPanel("Plate Monitoring Program Map",
            leafletOutput("leafletmap",height=800)
+  ),
+  tabPanel("eDNA Map",
+           leafletOutput("leafletmap_eDNA",height=800)
+  ),
+  tabPanel("Public Reports Map",
+           leafletOutput("leafletmap_pReport",height=800)
   ),
   
   
@@ -221,13 +215,7 @@ ui <- navbarPage(
                         value = 3),
            numericInput(inputId = "incidentalyear",
                         label = "Ignore incidental observation records older than:",
-                        value = 1900),
-           numericInput(inputId = "metabarcodingyear",
-                        label = "Ignore metabarcoding records older than:",
-                        value = 1900),
-           numericInput(inputId = "metabarcodingstrikes",
-                        label = "Number of non-detection records required to reverse a detection (i.e. when is an AIS considered 'failed to establish'):",
-                        value = 3)
+                        value = 1900)
   ),
   
   tabPanel("Read Me",
@@ -272,6 +260,33 @@ server <- function(input, output, session) {
       inner_join(monitoring_sites,by = "StnLocation")
   })
   
+  #filtering metabarcoding data data
+  metabarcoding_filtered <- reactive({
+    #browser()
+    metabarcoding %>% 
+      as.data.table() %>% 
+      dplyr::select(-geometry) %>%
+      gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
+      group_by(Species,StnLocation) %>% 
+      # mutate(Species=(as.character(Species)), 
+      #        Presence=(as.character(Presence)))%>%
+      summarize(
+        History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
+                          any(!Presence)~paste0("Detected in: ",
+                                                paste(Year[Presence],collapse = ", "),
+                                                ", and not detected in: ",
+                                                paste(Year[!Presence],collapse = ", ")),
+                          TRUE~paste("Detected in",paste(Year,collapse = ","))),
+        Presence = if_else(all(is.na(Presence)),
+                           FALSE,
+                           any(Presence>0,na.rm = TRUE))
+      ) %>% 
+      ungroup() %>% 
+      mutate(Presence=as.character(Presence)) %>%  
+      tidyr::pivot_longer(cols = c(Presence,History)) %>% 
+      tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
+      inner_join(metabarcoding_sites,by = "StnLocation")
+  })
   
   incidental_filtered <- reactive({
     # browser()
@@ -293,42 +308,6 @@ server <- function(input, output, session) {
     
     
   })
-  
-  metabarcoding_filtered <- reactive({
-     #browser()
-    metabarcoding %>%
-      filter(Year>=input$metabarcodingyear) %>%
-      as.data.table() %>%
-      dplyr::select(-geometry) %>%
-      gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
-      group_by(Species,StnLocation) %>% 
-      summarize(
-        History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
-                          length(Year)>input$metabarcodingstrikes&all(!tail(Presence,input$metabarcodingstrikes)) ~ paste0("Likely failed to establish, detected in: ",
-                                                                                                                     paste(Year[Presence],collapse = ", "),
-                                                                                                                     ", and not detected in: ",
-                                                                                                                     paste(Year[!Presence],collapse = ", ")),
-                          any(!Presence)~paste0("Detected in: ",
-                                                paste(Year[Presence],collapse = ", "),
-                                                ", and not detected in: ",
-                                                paste(Year[!Presence],collapse = ", ")),
-                          TRUE~paste("Detected in",paste(Year,collapse = ","))),
-        Presence = if_else(all(is.na(Presence)),
-                           FALSE,
-                           any(Presence>0,na.rm = TRUE))
-      ) %>% 
-      ungroup()%>%
-      mutate(prov=paste("Metabarcoding Results"),
-             Presence=as.character(Presence)) %>%
-      tidyr::pivot_longer(cols = c(Presence,History)) %>% 
-      tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
-      left_join(metabarcoding_sites,by = "StnLocation")
-
-  })
-
-  
-  
-  
   
   # functions for updating UI
   
@@ -362,18 +341,6 @@ server <- function(input, output, session) {
                                choices = nearestincidental$StnLocation)
     }
     
-    if(input$origmetabarcodingnum!=""){
-      nearestmetabarcoding <- nearestsites(lease,
-                                        prov,
-                                        metabarcoding_filtered() %>% filter(name=="Presence")%>% 
-                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
-                                        as.numeric(input$origmetabarcodingnum),
-                                        metabarcoding_dist_orig())
-
-      updateCheckboxGroupInput(session,
-                               "origmetabarcodingsite",
-                               choices = nearestmetabarcoding$StnLocation)
-    }
     
   }
   
@@ -407,23 +374,7 @@ server <- function(input, output, session) {
                                choices = nearestincidental$StnLocation)
     }
     
-    if(input$destmetabarcodingnum!=""){
-      nearestmetabarcoding <- nearestsites(lease,
-                                           prov,
-                                        metabarcoding_filtered() %>% filter(name=="Presence")%>% 
-                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
-                                        as.numeric(input$destmetabarcodingnum),
-                                        metabarcoding_dist_dest())
-
-      updateCheckboxGroupInput(session,
-                               "destmetabarcodingsite",
-                               choices = nearestmetabarcoding$StnLocation)
-    }
   }
-  
-  
-  
-  
   
   
   # Observe events to trigger updates
@@ -468,13 +419,6 @@ server <- function(input, output, session) {
                       prov=origprovInput())
   })
   
-  # Origin - # of metabarcoding sites
-  observeEvent(input$origmetabarcodingnum, {
-    update_orig_sites(lease=origprovInput() %>%
-                        filter(Lease_Identifier==input$origlease),
-                      prov=origprovInput())
-  })
-  
   # Destination - choose a province 
   observeEvent(input$destprov, {
     #get provincial leases
@@ -513,20 +457,7 @@ server <- function(input, output, session) {
                         filter(Lease_Identifier==input$destlease),
                       prov=destprovInput())
   })
-  # Destination - # of metabarcoding sites
-  observeEvent(input$destmetabarcodingnum, {
-    update_dest_sites(lease=destprovInput() %>%
-                        filter(Lease_Identifier==input$destlease),
-                      prov=destprovInput())
-  })
-  
-  
-    
  
-  
-  
-  
-
   
   # reactive switches that get the correct leases and distance matrices
   origprovInput <- reactive({
@@ -557,12 +488,6 @@ server <- function(input, output, session) {
            "PEI" = pei_incidental_dist)
   })
   
-  metabarcoding_dist_orig <- reactive({
-    switch(input$origprov,
-           "NS" = ns_metabarcoding_dist,
-           "NB"=nb_metabarcoding_dist,
-           "PEI"=pei_metabarcoding_dist)
-  })
 
   monitoring_dist_dest <- reactive({
     switch(input$destprov,
@@ -578,12 +503,6 @@ server <- function(input, output, session) {
            "PEI" = pei_incidental_dist)
   })
   
-  metabarcoding_dist_dest <- reactive({
-    switch(input$destprov,
-           "NS" = ns_metabarcoding_dist,
-           "NB" = nb_monitoring_dist,
-           "PEI" = pei_monitoring_dist)
-  })
   #### Leaflet maps ####
   
   # full interactive map
@@ -595,14 +514,27 @@ server <- function(input, output, session) {
                         dplyr::select(PEI,Lease_Identifier))
     basemap(leases=all_leases,
             incidentals=incidental_filtered(),
-            metabarcoding=metabarcoding_filtered()%>% filter(name=="Presence") %>% 
-              dplyr::select(-name) %>% 
-              mutate(across(2:(ncol(.)-1),as.logical)),
             monitoring=monitoring_filtered() %>% filter(name=="Presence") %>% 
               dplyr::select(-name) %>% 
               mutate(across(2:(ncol(.)-1),as.logical)),
-            monitoringsp=AIS$R_Name,
-            metabarcodingsp=AIS_meta$R_Name)
+            monitoringsp=AIS$R_Name)
+  })
+  
+  #eDNA map
+  output$leafletmap_eDNA <- renderLeaflet({
+    # browser()
+    
+    all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
+                        dplyr::select(NB,Lease_Identifier),
+                        dplyr::select(PEI,Lease_Identifier))
+    basemap_eDNA(leases=all_leases,
+                 metabarcoding=metabarcoding_filtered() %>% filter(name=="Presence") %>% 
+                   dplyr::select(-name) %>% 
+                   mutate(across(2:(ncol(.)-1),as.logical)),
+            # metabarcoding=metabarcoding%>%
+            #   pivot_longer(col=-c(1:2, 13), names_to = "name", values_to = "Presence")%>%
+            #   filter(Presence==1),
+            metabarcodingsp=AIS$R_Name)
   })
 
 
@@ -639,23 +571,12 @@ server <- function(input, output, session) {
                                        as.numeric(input$origincidentalnum),
                                        incidental_dist_orig())
     }
-    
-    if(input$origmetabarcodingnum!=""){
-      nearestmetabarcoding <- nearestsites(lease,
-                                           prov,
-                                           metabarcoding_filtered()%>% filter(name=="Presence") %>% 
-                                             dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% mutate(across(2:(ncol(.)-1),as.logical)),
-                                           as.numeric(input$origmetabarcodingnum),
-                                           metabarcoding_dist_orig())
-    }
 
-    if(input$origincidentalnum!="" & input$origmonitoringnum!="" & input$origmetabarcodingnum!=""){
+    if(input$origincidentalnum!="" & input$origmonitoringnum!=""){
       basemap(leases=lease,
               incidentals=nearestincidental,
-              metabarcoding=nearestmetabarcoding,
               monitoring=nearestmonitoring,
-              monitoringsp=AIS$R_Name,
-              metabarcodingsp=AIS$R_Name)
+              monitoringsp=AIS$R_Name)
     }
     
    
@@ -692,23 +613,11 @@ server <- function(input, output, session) {
                                         incidental_dist_dest())
     }
     
-    if(input$destmetabarcodingnum!=""){
-      nearestmetabarcoding <- nearestsites(lease,
-                                        prov,
-                                        metabarcoding_filtered() %>% filter(name=="Presence") %>% 
-                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
-                                       # metabarcoding_filtered(),
-                                        as.numeric(input$destmetabarcodingnum),
-                                        metabarcoding_dist_dest())
-    }
-    
-    if(input$destincidentalnum!="" & input$destmonitoringnum!="" & input$destmetabarcodingnum!=""){
+    if(input$destincidentalnum!="" & input$destmonitoringnum!=""){
       basemap(leases=lease,
               incidentals=nearestincidental,
-              metabarcoding=nearestmetabarcoding,
               monitoring=nearestmonitoring,
-              monitoringsp=AIS$R_Name,
-              metabarcodingsp=AIS_meta$R_Name)
+              monitoringsp=AIS$R_Name)
     }
 
  
@@ -724,24 +633,20 @@ server <- function(input, output, session) {
     # prevent summary/suggested responses if inadequate sites selected
     if(is.null(input$origmonitoringsite)&
        is.null(input$origincidentalsite)&
-       is.null(input$origmetabarcodingsite)&
        is.null(input$destmonitoringsite)&
-       is.null(input$destincidentalsite)&
-       is.null(input$destmetabarcodingsite)
+       is.null(input$destincidentalsite)
        ){
       summary <- data.frame(
         Site = "No biofouling monitoring sites or incidental observation sites were selected on the Origin or Destination tab"
       )
     } else if(is.null(input$origmonitoringsite)&
-              is.null(input$origincidentalsite)&
-              is.null(input$origmetabarcodingsite)
+              is.null(input$origincidentalsite)
               ){
       summary <- data.frame(
         Site = "No biofouling monitoring sites or incidental observation sites were selected on the Origin tab"
       )
     }else if(is.null(input$destmonitoringsite)&
-             is.null(input$destincidentalsite)&
-             is.null(input$destmetabarcodingsite)
+             is.null(input$destincidentalsite)
              ){
       summary <- data.frame(
         Site = "No biofouling monitoring sites or incidental observation sites were selected on the Destination tab"
@@ -812,60 +717,7 @@ server <- function(input, output, session) {
           summarize(Presence = any(as.logical(Presence)))
       }
       
-      # get metabarcoding data for origin
-      if(!is.null(input$origmetabarcodingsite)){
-        # origin <- origin %>%
-        #   bind_rows(metabarcoding_filtered() %>%
-        #               filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmetabarcodingsite)) %>%
-        #               data.frame() %>%
-        #               mutate(Species=gsub("\\.","_",Species)) %>%
-        #               filter(Species %in% AIS$R_Name) %>%
-        #               group_by(Species) %>%
-        #               summarize(Presence = any(as.logical(Presence)))) %>%
-        #   group_by(Species) %>%
-        #   summarize(Presence = any(as.logical(Presence)))
-        
-        origin <- origin%>%
-          bind_rows(metabarcoding_filtered()%>% filter(name=="Presence") %>% 
-          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
-          filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$origmonitoringsite)) %>% 
-          data.frame() %>% 
-          gather(key="Species",value="Presence",-StnLocation) %>% 
-          #mutate(Species=gsub("\\."," ",Species)) %>%
-          mutate(Species=gsub("\\.","_",Species)) %>% 
-          filter(Species %in% AIS$R_Name) %>% 
-          group_by(Species) %>% 
-          summarize(Presence = any(as.logical(Presence)))
-          )
-
-      }
       
-
-      # get metabarcoding data for destination
-      if(!is.null(input$destmetabarcodingsite)){
-        destination <- destination %>%
-          bind_rows( metabarcoding_filtered() %>% filter(name=="Presence") %>% 
-              dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)) %>% 
-              filter(gsub("\\s*\\([^\\)]+\\)","",StnLocation) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmonitoringsite)) %>% 
-              data.frame() %>% 
-              gather(key="Species",value="Presence",-StnLocation) %>% 
-              #mutate(Species=gsub("\\."," ",Species)) %>% 
-              mutate(Species=gsub("\\.","_",Species)) %>% 
-              filter(Species %in% AIS$R_Name) %>% 
-              group_by(Species) %>% 
-              summarize(Presence = any(as.logical(Presence)))
-            )
-          #   metabarcoding_filtered() %>%
-          #             filter(gsub("\\s*\\([^\\)]+\\)","",paste(Species,StnLocation)) %in% gsub("\\s*\\([^\\)]+\\)","",input$destmetabarcodingsite)) %>%
-          #             data.frame() %>%
-          #             #mutate(Species=gsub("\\."," ",Species)) %>%
-          #             mutate(Species=gsub("\\.","_",Species)) %>%
-          #             filter(Species %in% AIS$R_Name) %>%
-          #             group_by(Species) %>%
-          #             summarize(Presence = any(as.logical(Presence)))) %>%
-          # group_by(Species) %>%
-          # summarize(Presence = any(as.logical(Presence)))
-      }
 
       summary <- full_join(origin,destination,by="Species",suffix=c(" (Origin)"," (Destination)")) %>% 
         replace_na(list(Species=NA,"Presence (Origin)"=FALSE,"Presence (Destination)"=FALSE)) %>% 
