@@ -238,6 +238,31 @@ incidental <-  dplyr::bind_rows(
 saveRDS(incidental_sites,"outputdata/incidental_sites.rds")
 saveRDS(incidental,"outputdata/incidental.rds")
 
+#Public incidental reports
+
+publicdata_sites <- incidental_occ %>%
+  dplyr::select(StnLocation)%>%
+  dplyr::group_by(StnLocation) %>% 
+  dplyr::summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
+  unique() %>% 
+  sf::st_transform(equidist) %>% 
+  dplyr::filter(geometry%>% 
+                  st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
+                  lengths()>0) %>% 
+  sf::st_transform(proj)
+
+publicdata<- incidental_occ %>%
+  dplyr::mutate(across(.fns = as.character))%>%
+  as.data.table()%>%
+  unique() %>%
+  dplyr::select(Species,StnLocation,Year,prov) %>% 
+  dplyr::right_join(publicdata_sites,by = "StnLocation") %>% 
+  st_sf()%>%
+  na.omit()
+
+saveRDS(publicdata_sites,"outputdata/publicdata_sites.rds")
+saveRDS(publicdata,"outputdata/publicdata.rds")
+
 #Genomics Data
 metabarcode<-read.csv("recentdata/metbarcoding_MAR.csv")%>%
   st_as_sf(coords=c("longitude","latitude"),crs=4326)%>%
