@@ -316,7 +316,7 @@ server <- function(input, output, session) {
   
 #Public report map filtering
   publicdata_filtered <- reactive({
-     browser()
+     #browser()
     publicdata %>% 
       as.data.table() %>% 
       dplyr::select(-geometry) %>% 
@@ -554,13 +554,14 @@ server <- function(input, output, session) {
   
   #Public Reports map
   output$leafletmap_pReport<- renderLeaflet({
-    # browser()
+     #browser()
     
     all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
                         dplyr::select(NB,Lease_Identifier),
                         dplyr::select(PEI,Lease_Identifier))
     basemap_pReport(leases=all_leases,
-                 incidentals=incidental_filtered())
+                 publicdata=publicdata_filtered(),
+                 publicdatasp=AIS$R_Name)
   })
 
 
