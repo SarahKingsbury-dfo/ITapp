@@ -51,7 +51,6 @@ nearestsites <- function(lease,prov,sites,n,distmat){
 
 #### basemap ####
 basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
- # metabarcoding, metabarcodingsp,
   #browser()
 
   IncidentalIcons <- iconList(
@@ -143,25 +142,11 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
                    collapse="\n"))
   }
 
-  
-  
-  # if(!all(metabarcoding$Species %in% names(MetabarcodeIcons))){
-  #   warning(paste0("basemap() in functions.R does not have a logo associated with: ",
-  #                  unique(metabarcoding$Species[!metabarcoding$Species %in% names(MetabarcodeIcons)]),
-  #                  collapse="\n"))
-  # }
 
-  # the url's need to be actual url's above for this to work, commenting out for now
-  # html_legend <- paste0("<img src='",getwd(),"/",IncidentalIcons$`Carcinus maenas`$iconUrl,"'>  Incidental Observations")
   
  #browser()
   sp <- monitoringsp[monitoringsp %in% names(monitoring)]
-  # sp_m<-metabarcoding%>%
-  #   dplyr::select(-StnLocation, -distance)%>%
-  #   tidyr::pivot_longer(!geometry, names_to="species", values_to="presence")%>%
-  #   dplyr::filter(presence=="TRUE")%>%
-  #   dplyr::select(species)
-  # 
+
   leaflet(leases,...) %>%
     addTiles() %>%
     addPolygons(popup = paste("Lease:",leases$Lease_Identifier),group = "Leases") %>%
@@ -200,6 +185,99 @@ basemap_eDNA <- function(leases, metabarcoding, metabarcodingsp,...){
                      options = layersControlOptions(collapsed = FALSE))
   
 }
+
+#### basemap Public Species Reports ####
+basemap_pReport<- function(leases, publicdata,...){
+  
+  #browser()
+  # IncidentalIcons <- iconList(
+  #   "Argopecten_irradians" = makeIcon(
+  #     iconUrl = "mussel.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Ascidiella_aspersa" = makeIcon(
+  #     iconUrl = "tunicate.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Botrylloides_violaceus" = makeIcon(
+  #     iconUrl = "tunicate.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Botryllus_schlosseri" = makeIcon(
+  #     iconUrl = "tunicate.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Caprella_mutica" = makeIcon(
+  #     iconUrl = "skeletonshrimp.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Carcinus_maenas" = makeIcon(
+  #     iconUrl = "GreenCrab.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Ciona_intestinalis" = makeIcon(
+  #     iconUrl = "tunicate.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Codium_fragile" = makeIcon(
+  #     iconUrl = "algae.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Didemnum_vexillum" = makeIcon(
+  #     iconUrl = "tunicate.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Diplosoma_listerianum" = makeIcon(
+  #     iconUrl = "tunicate.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Hemigrapsus_sanguineus" = makeIcon(
+  #     iconUrl = "blackCrab.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Membranipora_membranacea" = makeIcon(
+  #     iconUrl = "algae.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Oncorhynchus_mykiss" = makeIcon(
+  #     iconUrl = "trout.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Ostrea_edulis" = makeIcon(
+  #     iconUrl = "mussel.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15),
+  #   "Styela_clava" = makeIcon(
+  #     iconUrl = "blackCrab.png",
+  #     iconWidth = 30,
+  #     iconHeight = 15)
+  # )
+  # 
+  # if(!all(publicdata$Species %in% names(IncidentalIcons))){
+  #   warning(paste0("basemap() in functions.R does not have a logo associated with: ",
+  #                  unique(publicdata$Species[!publicdata$Species %in% names(IncidentalIcons)]),
+  #                  collapse="\n"))
+  # }
+  
+  pal<- colorBin(palette = "Reds",
+                 domain = publicdata$Species)
+  
+  leaflet(leases,...) %>%
+    addTiles() %>%
+    addPolygons(popup = paste("Lease:",leases$Lease_Identifier),group = "Leases") %>%
+    addCircleMarkers(data=publicdata$geometry,
+                     color = ~pal(Species),
+                     stroke = FALSE,
+                     fillOpacity = 0.9)%>%
+  # addMarkers(data=publicdata$geometry,
+  #            icon = IncidentalIcons[as.numeric(factor(publicdata$Species,levels=sort(AIS$R_Name)))],
+  #            group = publicdata$Species
+  # ) %>%
+  addLayersControl(overlayGroups = c("Leases",publicdata$Species),
+                   options = layersControlOptions(collapsed = FALSE))
+}
+  
+
 
 create_response <- function(summitigation,species){
   if("Site" %in% names(summitigation)){

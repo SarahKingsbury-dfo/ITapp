@@ -73,6 +73,8 @@ if(!file.exists("outputdata/pei_monitoring_dist.rds")){
   source("prepare_data.R")
 }
 
+publicdata_sites <- readRDS("outputdata/publicdata_sites.rds")
+publicdata <- readRDS("outputdata/publicdata.rds")
 incidental_sites <- readRDS("outputdata/incidental_sites.rds")
 incidental <- readRDS("outputdata/incidental.rds")
 monitoring_sites <- readRDS("outputdata/monitoring_sites.rds")
@@ -88,6 +90,7 @@ nb_metabarcoding_dist<-readRDS("outputdata/nb_metabarcoding_dist.rds")
 pei_incidental_dist <- readRDS("outputdata/pei_incidental_dist.rds")
 pei_monitoring_dist <- readRDS("outputdata/pei_monitoring_dist.rds")
 pei_metabarcoding_dist<-readRDS("outputdata/pei_metabarcoding_dist.rds")
+
 
 greenCrabIcon <- makeIcon(
   iconUrl = "GreenCrab.png",
@@ -288,6 +291,8 @@ server <- function(input, output, session) {
       inner_join(metabarcoding_sites,by = "StnLocation")
   })
   
+#filtering incidental reports by by DFO or made to DFO's email inboxs that had photo evidence
+  
   incidental_filtered <- reactive({
     # browser()
     incidental %>% 
@@ -307,6 +312,19 @@ server <- function(input, output, session) {
       left_join(incidental_sites,by = "StnLocation")
     
     
+  })
+  
+#Public report map filtering
+  publicdata_filtered <- reactive({
+     browser()
+    publicdata %>% 
+      as.data.table() %>% 
+      dplyr::select(-geometry) %>% 
+      group_by(Species,StnLocation) %>% 
+      summarize(Presence = TRUE,
+                prov = paste(unique(prov))) %>% 
+      ungroup() %>% 
+      left_join(publicdata_sites,by = "StnLocation")
   })
   
   # functions for updating UI
@@ -531,10 +549,18 @@ server <- function(input, output, session) {
                  metabarcoding=metabarcoding_filtered() %>% filter(name=="Presence") %>% 
                    dplyr::select(-name) %>% 
                    mutate(across(2:(ncol(.)-1),as.logical)),
-            # metabarcoding=metabarcoding%>%
-            #   pivot_longer(col=-c(1:2, 13), names_to = "name", values_to = "Presence")%>%
-            #   filter(Presence==1),
             metabarcodingsp=AIS$R_Name)
+  })
+  
+  #Public Reports map
+  output$leafletmap_pReport<- renderLeaflet({
+    # browser()
+    
+    all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
+                        dplyr::select(NB,Lease_Identifier),
+                        dplyr::select(PEI,Lease_Identifier))
+    basemap_pReport(leases=all_leases,
+                 incidentals=incidental_filtered())
   })
 
 
