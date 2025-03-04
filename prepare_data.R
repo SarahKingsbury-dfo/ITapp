@@ -195,8 +195,8 @@ mar_incidental <- read.csv("recentdata/Incidental_AIS_Reports_MAR.csv")%>%
   filter(Species %in% species$R_Name) #only keep species of relevance to I&T transfers
 
 incidental_sites <- rbind(
-  incidental_occ %>%
-    dplyr::select(StnLocation),
+  # incidental_occ %>%
+  #   dplyr::select(StnLocation),
   asian_shore_crab_2020 %>% 
     dplyr::select(StnLocation),
   gulf_tunicate_incidental_2020 %>% 
@@ -220,10 +220,11 @@ incidental_sites <- rbind(
                   lengths()>0) %>% 
   sf::st_transform(proj)
 
+#Note: incidental reports from iNat and GBiF will be moved to a public reports tab because these are unverified reports
 incidental <-  dplyr::bind_rows(
-  incidental_occ %>%
-    mutate(across(.fns = as.character))%>%
-    as.data.table(),
+  # incidental_occ %>%
+  #   mutate(across(.fns = as.character))%>%
+  #   as.data.table(),
   asian_shore_crab_2020 %>%
     dplyr::mutate(across(.fns = as.character))%>%
     as.data.table(),
@@ -278,24 +279,114 @@ saveRDS(publicdata_sites,"outputdata/publicdata_sites.rds")
 saveRDS(publicdata,"outputdata/publicdata.rds")
 
 #Genomics Data
-metabarcode<-read.csv("recentdata/metbarcoding_MAR.csv")%>%
+metabarcode_2022<-read.csv("recentdata/metbarcoding_MAR_2022.csv")%>%
   st_as_sf(coords=c("longitude","latitude"),crs=4326)%>%
   st_transform(proj)%>%
-  dplyr::select(-sample_name, -LAB)
+  dplyr::select(-sample_name, -LAB)%>%
+  as.data.frame()
 
+metabarcode_2023<-readxl::read_excel("recentdata/MAR-Metabarcoding-ESV_2023.xlsx",sheet=1,col_types =  "text") %>% 
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
+  st_transform(proj)%>% 
+dplyr::rename(StnLocation=Location,
+              "Botrylloides_violaceus"="Botrylloides violaceus",
+              "Caprella_mutica"="Caprella mutica",
+              "Ascidiella_aspersa" ="Ascidiella aspersa",
+              "Ciona_intestinalis"="Ciona intestinalis",
+              "Membranipora_membranacea"="Membranipora membranacea")%>%
+  mutate(Year=as.factor("2023"))%>%
+  dplyr::select("Year","StnLocation", "Botrylloides_violaceus", "Caprella_mutica", "Ascidiella_aspersa", "Ciona_intestinalis", "Membranipora_membranacea", "geometry")%>%
+  as.data.frame()
 
-metabarcoding_sites<-metabarcode%>% 
-    group_by(StnLocation) %>% 
-    summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
-    unique() %>% 
-    st_transform(equidist) %>% 
-    filter(geometry%>% 
-             st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
-             lengths()>0) %>% 
-    st_transform(proj)
+eDNA_2023<- readxl::read_excel("recentdata/MAR-Metabarcoding-qPCR_2023.xlsx",sheet=1,col_types =  "text") %>% 
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
+  st_transform(proj)%>%
+  mutate(Botrylloides_violaceus=as.character(case_when(`Botrylloides violaceus...15`=="Detected"~1,
+                                                    `Botrylloides violaceus...31`=="Detected"~1)),
+         Caprella_mutica=as.character(case_when(`Caprella mutica`=="Detected"~1)),
+         Ascidiella_aspersa=as.character(case_when(`Ascidiella aspersa...13`=="Detected"~1,
+                                                    `Ascidiella aspersa...27`=="Detected"~1)),
+         Ciona_intestinalis=as.character(case_when(`Ciona intestinalis...17`=="Detected"~1)),
+         Membranipora_membranacea=as.character(case_when(`Membranipora membranacea...28`=="Detected"~1,
+                                                `Membranipora membranacea...19`=="Detected"~1)),
+         Botryllus_schlosseri=as.character(case_when(`Botryllus schlosseri`=="Detected"~1)),
+         Styela_Clava=as.character(case_when(`Styela Clava`=="Detected"~1)),
+         Hemigrapsus_sanguineus=as.character(case_when(`Hemigrapsus sanguineus`=="Detected"~1)),
+         Didemnum_vexillum=as.character(case_when(`Didemnum vexillum`=="Detected"~1)),
+         Diplosoma_listerianum=as.character(case_when(`Diplosoma listerianum`=="Detected"~1))
+         )%>%
+  dplyr::rename(StnLocation=Site)%>%
+  mutate(Year=as.factor("2023"))%>%
+  dplyr::select("Year", "StnLocation", "Botrylloides_violaceus", "Caprella_mutica", "Ascidiella_aspersa", "Ciona_intestinalis", "Membranipora_membranacea","Botryllus_schlosseri", "Styela_Clava","Hemigrapsus_sanguineus", "Didemnum_vexillum", "Diplosoma_listerianum", "geometry")%>%
+  as.data.frame()
+
+eDNA_2023[is.na(eDNA_2023)]<-0
+
+#we only have the qPCR eDNA results from 2024 thus far. 
+eDNA_2024<-readxl::read_excel("recentdata/RESULTS-Preliminary_Harbour Monitoring Project_targeted qPCR.xlsx")%>% 
+  filter(!Latitude == "NA")%>%
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
+  st_transform(proj)%>%
+  mutate(Botrylloides_violaceus=as.character(case_when(`B.  violaceus Site result`=="Detected"~1)),
+         Caprella_mutica=as.character(case_when(`C. mutica Site result`=="Detected"~1)),
+         Ascidiella_aspersa=as.character(case_when(`A. aspersa Site result`=="Detected"~1)),
+         Ciona_intestinalis=as.character(case_when(`C. intestinalis Site result`=="Detected"~1)),
+         Botryllus_schlosseri=as.character(case_when(`B. schlosseri Site result`=="Detected"~1)),
+         Styela_Clava=as.character(case_when(`S. clava Site result`=="Detected"~1)),
+         Diplosoma_listerianum=as.character(case_when(`D. listerianum Site result`=="Detected"~1))
+  )%>%
+  dplyr::rename(StnLocation=Location)%>%
+  mutate(Year=as.factor("2024"))%>%
+  dplyr::select("Year", "StnLocation", "Botrylloides_violaceus", "Caprella_mutica", "Ascidiella_aspersa", "Ciona_intestinalis", "Botryllus_schlosseri", "Styela_Clava","Diplosoma_listerianum", "geometry")%>%
+  as.data.frame()
+
+eDNA_2024[is.na(eDNA_2024)]<-0 
   
+metabarcoding_sites<-rbind(metabarcode_2022%>% 
+                             dplyr::select(StnLocation, geometry),
+                           metabarcode_2023%>% 
+                             dplyr::select(StnLocation, geometry),
+                           eDNA_2023%>% 
+                             dplyr::select(StnLocation, geometry),
+                           eDNA_2024%>% 
+                             dplyr::select(StnLocation, geometry))%>%
+  na.omit()%>%
+  st_as_sf()%>%
+  dplyr::group_by(StnLocation) %>% 
+  dplyr::summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
+  unique() %>% 
+  sf::st_transform(equidist) %>% 
+   dplyr::filter(geometry%>% 
+           st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
+           lengths()>0) %>% 
+  st_transform(proj)
+
+metabarcoding<-dplyr::bind_rows(
+  metabarcode_2022%>%
+    dplyr::mutate(across(.fns = as.character))%>%
+    pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
+    filter(Presence=="1"),
+  metabarcode_2023%>%
+    dplyr::mutate(across(.fns = as.character))%>%
+    pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
+    filter(Presence=="1"),
+  eDNA_2023%>%
+    dplyr::mutate(across(.fns = as.character))%>%
+    pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
+    filter(Presence=="1"),
+  eDNA_2024%>%
+    dplyr::mutate(across(.fns = as.character))%>%
+    pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
+    filter(Presence=="1")
+)%>%
+  unique() %>%
+  dplyr::select(Species,StnLocation,Year) %>% 
+  dplyr::right_join(metabarcoding_sites,by = "StnLocation") %>% 
+  st_sf()%>%
+  na.omit()
+
 saveRDS(metabarcoding_sites, "outputdata/metabarcoding_sites.rds")
-saveRDS(metabarcode, "outputdata/metabarcoding.rds")
+saveRDS(metabarcoding, "outputdata/metabarcoding.rds")
 
 # Load and clean up monitoring data ---------------------------------------
 
