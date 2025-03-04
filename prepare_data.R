@@ -391,41 +391,27 @@ saveRDS(metabarcoding, "outputdata/metabarcoding.rds")
 # Load and clean up monitoring data ---------------------------------------
 
 # Maritimes Tunicates
-maritimes_tunicate_monitor <- rbind(
-  (lapply(2:9,function(x)
-     {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for A. aspersa
+#Biofouling data for MAR is available here: https://open.canada.ca/data/en/dataset/8d87f574-0661-40a0-822f-e9eabc35780d
+#Please note that due to the file size, some of the data will be accessed in the first pull and the rest accessed in teh second pull. Data includes 2006-2023
+maritimes_tunicate_monitor_1 <- rbind(
+  (lapply(2:13,function(x)
+     {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for A. aspersa
      })%>%
      bind_rows()),
-  (lapply(29:42,function(x)
-  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for B. violaceus
+  (lapply(29:46,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for B. violaceus
   })%>%
     bind_rows()),
-  (lapply(68:81,function(x)
-  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for B. schlosseri
+  (lapply(68:85,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for B. schlosseri
   })%>%
     bind_rows()),
-  (lapply(107:114,function(x)
-  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for C. mutica
+  (lapply(107:118,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for C. mutica
   })%>%
     bind_rows()),
-  (lapply(134:147,function(x)
-  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for C. intestinalis
-  })%>%
-    bind_rows()),
-  (lapply(173:180,function(x)
-  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for D. vexillum
-  })%>%
-    bind_rows()),
-  (lapply(200:207,function(x)
-  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for D. listerianum
-  })%>%
-    bind_rows()),
-  (lapply(230:237,function(x)
-  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for M. membranacea
-  })%>%
-    bind_rows()),
-  (lapply(257:264,function(x)
-  {arcpullr::get_spatial_layer(paste0("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Maritimes_Biofouling_Monitoring_Program_En/MapServer/",x))#download all years of data at once for S. clava
+  (lapply(257:268,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for S. clava
   })%>%
     bind_rows())
   )%>%
@@ -433,31 +419,45 @@ maritimes_tunicate_monitor <- rbind(
   st_transform(proj) %>% 
   dplyr::select(-OBJECTID,-latitude,-longitude,-cover_index,-province,-stn_num)
 
+maritimes_tunicate_monitor_2 <- rbind(
+  (lapply(134:151,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for C. intestinalis
+  })%>%
+    bind_rows()),
+  (lapply(173:184,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for D. vexillum
+  })%>%
+    bind_rows()),
+  (lapply(200:211,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for D. listerianum
+  })%>%
+    bind_rows()),
+  (lapply(230:241,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for M. membranacea
+  })%>%
+    bind_rows())
+)%>%
+  dplyr::rename(geometry=geoms,Year = year, StnLocation=stn_location)%>% 
+  st_transform(proj) %>% 
+  dplyr::select(-OBJECTID,-latitude,-longitude,-cover_index,-province,-stn_num)
 
-maritimes_tunicate_2020 <- read.csv("recentdata/AIS_2020_present_absent.csv")%>% 
-  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>% 
-  dplyr::rename(Didemnum_vexillum=Didemnum_Vexillum)%>% 
-  st_transform(proj)%>% 
-  dplyr::select(-Region,-StnNum) %>% 
-  mutate(Year=2020)
-
-maritimes_tunicate_2021 <- read.csv("recentdata/Final_AIS_2021_present_absent.csv")%>%
-  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
+#the 2024 data is not yet availabel online and must be entered manually
+                                
+maritimes_tunicate_2024 <- read.csv("recentdata/Final_AIS_tunicate_2006_2024_present_absent_long.csv")%>%
+  filter(year=="2024")%>%
+  st_as_sf(coords=c('longitude','latitude'),crs=4326)%>%
+  dplyr::rename(species_name=species.name,Year = year, StnLocation=stn.location)%>%
   st_transform(proj)%>%
-  dplyr::select(-StnNum) %>%
-  mutate(Year=2021)
+  dplyr::select(-cover_index,-province,-stn_num) 
 
-maritimes_tunicate_2022<-read.csv("recentdata/Final_AIS_2022_present_absent_MAR.csv")%>%
-st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
-  st_transform(proj)%>%
-  dplyr::select(-StnNum) %>%
-  mutate(Year=2022)
+maritimes_tunicate_monitor<-rbind(maritimes_tunicate_monitor_1,
+                                  maritimes_tunicate_monitor_2,
+                                  maritimes_tunicate_2024)%>%
+  mutate(Species=gsub(" ","_",species_name))%>%
+  dplyr::select(-species_name)%>%
+  mutate(Presence=as.integer(1))%>%
+  st_transform(proj)
 
-maritimes_tunicate_2023<-read.csv("recentdata/MAR_Final_AIS_2023_present_absent_Dec7th_23.csv")%>%
-  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
-  st_transform(proj)%>%
-  dplyr::select(-StnNum) %>%
-  mutate(Year=2023)
 
 # Gulf Tunicates
 # gulf_tunicate_monitor <- esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Gulf_Region_Aquatic_Invasive_Species_Data/MapServer/0")
@@ -474,7 +474,9 @@ gulf_tunicate_monitor_2020 <- readxl::read_excel("recentdata/Gulf AIS data_biof_
                 "Caprella_mutica"="C mutica",
                 "Membranipora_membranacea"="M membranacea", 
                 "Carcinus_maenas"="C maenas",
-                "Codium_fragile"="C fragile")
+                "Codium_fragile"="C fragile")%>%
+  dplyr::select(-Province)%>%
+  st_transform(proj)
 
 gulf_tunicate_monitor_2021 <- readxl::read_excel("recentdata/Copy of P-A Table_2021 data_March2022.xlsx") %>% 
   st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
@@ -486,32 +488,47 @@ gulf_tunicate_monitor_2021 <- readxl::read_excel("recentdata/Copy of P-A Table_2
                 "Caprella_mutica"="C mutica",
                 "Membranipora_membranacea"="M membranacea", 
                 "Carcinus_maenas"="C maenas",
-                "Codium_fragile"="C fragile")
+                "Codium_fragile"="C fragile")%>%
+  dplyr::select(-Province)%>%
+  st_transform(proj)
 
 gulf_tunicate_monitor_2022 <- readxl::read_excel("recentdata/Copy of 2022 P-A Data_AIS monitoring_Gulf Region_Jan2023.xlsx") %>% 
   st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
   dplyr::rename(StnLocation=Station_Name)%>%
-  dplyr::select(-Date_In, -Date_Out) %>%
-  mutate(Year=2022)
+  dplyr::select(-Date_In, -Date_Out, -Province) %>%
+  mutate(Year=2022)%>%
+  st_transform(proj)
 
+#missing data for 2023 from Gulf
 
-monitoring_sites <- rbind(maritimes_tunicate_monitor%>% #from website
+gulf_tunicate_montior_2024<-readxl::read_excel("recentdata/Gulf 2024 AIS Data_Feb2025.xlsx", sheet=1, col_types = 'text') %>% 
+  filter(!Latitude=="NA")%>%
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
+  dplyr::rename(StnLocation=`Location/Station Name`,
+                "Botryllus_schlosseri"="B schlosseri",
+                "Botrylloides_violaceus"="B violaceus",
+                "Ciona_intestinalis"="C intestinalis",
+                "Styela_clava"="S clava",
+                "Caprella_mutica"="C mutica",
+                "Membranipora_membranacea"="M membranacea", 
+                "Carcinus_maenas"="C maenas",
+                "Codium_fragile"="C fragile",
+                "Juxtacribrilina_mutabilis"="J mutabilis"
+                )%>%
+  dplyr::select(-Province, -Comments)%>%
+  st_transform(proj)
+
+gulf_tunicate_monitor<-rbind(gulf_tunicate_incidental_2020,
+                             gulf_tunicate_incidental_2021,
+                             gulf_tunicate_incidental_2023,
+                             gulf_tunicate_incidental_2024)%>%
+  mutate(Presence=as.integer(Presence))%>%
+  dplyr::select(-prov)
+  
+
+monitoring_sites <- rbind(maritimes_tunicate_monitor%>% 
                             dplyr::select(StnLocation), 
-                          maritimes_tunicate_2020 %>% #from raw csv files
-                            dplyr::select(StnLocation),
-                          maritimes_tunicate_2021 %>% 
-                            dplyr::select(StnLocation),
-                          maritimes_tunicate_monitor %>% 
-                            dplyr::select(StnLocation),
-                          maritimes_tunicate_2022%>%
-                            dplyr::select(StnLocation),
-                          maritimes_tunicate_2023%>%
-                            dplyr::select(StnLocation),
-                          gulf_tunicate_monitor_2020 %>% 
-                            dplyr::select(StnLocation),
-                          gulf_tunicate_monitor_2021 %>% 
-                            dplyr::select(StnLocation),
-                          gulf_tunicate_monitor_2022 %>% 
+                          gulf_tunicate_monitor %>% 
                             dplyr::select(StnLocation)
                           ) %>% 
   group_by(StnLocation) %>% 
@@ -524,34 +541,21 @@ monitoring_sites <- rbind(maritimes_tunicate_monitor%>% #from website
            lengths()>0) %>% 
   st_transform(proj)
 
-monitoring <- bind_rows(maritimes_tunicate_monitor%>%
+monitoring <- rbind(maritimes_tunicate_monitor%>%
                           as.data.table(),
-                          maritimes_tunicate_2020 %>% 
-                          as.data.table(),
-                        maritimes_tunicate_2021 %>% 
-                          as.data.table(),
-                        maritimes_tunicate_monitor %>%
-                          as.data.table(),
-                        maritimes_tunicate_2022 %>%
-                          as.data.table(),
-                        maritimes_tunicate_2023 %>%
-                          as.data.table(),
-                        gulf_tunicate_monitor_2020 %>% 
-                          as.data.table(),
-                        gulf_tunicate_monitor_2021%>%
-                          as.data.table(),
-                        gulf_tunicate_monitor_2022%>%
+                        gulf_tunicate_monitor %>% 
                           as.data.table()) %>% 
   dplyr::select(-geometry) %>% 
   unique()%>%
-  gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
+  #gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
   group_by(Species,StnLocation,Year) %>% 
+  #unique()%>%
   summarize(Presence = if_else(all(is.na(Presence)),
                                FALSE,
-                               any(Presence>0,na.rm = TRUE))) %>% 
-  ungroup() %>% 
-  spread(key = "Species", value = "Presence") %>% 
-  right_join(monitoring_sites,by = "StnLocation") %>% 
+                               any(Presence>0,na.rm = TRUE))) %>%
+  ungroup() %>%
+  #spread(key = "Species", value = "Presence") %>%
+  right_join(monitoring_sites,by = "StnLocation") %>%
   st_sf() %>% 
   mutate(StnLocation=gsub("[ \t]+$","",StnLocation))
 
