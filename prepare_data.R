@@ -365,22 +365,23 @@ metabarcoding<-dplyr::bind_rows(
   metabarcode_2022%>%
     dplyr::mutate(across(.fns = as.character))%>%
     pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
-    filter(Presence=="1"),
+    filter(Presence>0),
   metabarcode_2023%>%
     dplyr::mutate(across(.fns = as.character))%>%
     pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
-    filter(Presence=="1"),
+    filter(Presence>0),
   eDNA_2023%>%
     dplyr::mutate(across(.fns = as.character))%>%
     pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
-    filter(Presence=="1"),
+    filter(Presence>0),
   eDNA_2024%>%
     dplyr::mutate(across(.fns = as.character))%>%
     pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
-    filter(Presence=="1")
+    filter(Presence>0)
 )%>%
+  mutate(Presence="TRUE")%>%
   unique() %>%
-  dplyr::select(Species,StnLocation,Year) %>% 
+  dplyr::select(Species,StnLocation,Year, Presence) %>% 
   dplyr::right_join(metabarcoding_sites,by = "StnLocation") %>% 
   st_sf()%>%
   na.omit()
