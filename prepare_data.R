@@ -361,30 +361,43 @@ metabarcoding_sites<-rbind(metabarcode_2022%>%
            lengths()>0) %>% 
   st_transform(proj)
 
-metabarcoding<-dplyr::bind_rows(
+
+metabarcoding<-bind_rows(
   metabarcode_2022%>%
-    dplyr::mutate(across(.fns = as.character))%>%
-    pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
-    filter(Presence>0),
+    mutate(Hemigrapsus_sanguineus=0,
+           across(everything(), as.character))%>%
+    as.data.frame(),
   metabarcode_2023%>%
-    dplyr::mutate(across(.fns = as.character))%>%
-    pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
-    filter(Presence>0),
-  eDNA_2023%>%
-    dplyr::mutate(across(.fns = as.character))%>%
-    pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
-    filter(Presence>0),
-  eDNA_2024%>%
-    dplyr::mutate(across(.fns = as.character))%>%
-    pivot_longer(cols = -c(StnLocation, Year, geometry), names_to = "Species", values_to = "Presence")%>%
-    filter(Presence>0)
+    mutate(Botryllus_schlosseri=0,
+           Styela_Clava=0,
+           Hemigrapsus_sanguineus=0,
+           Didemnum_vexillum=0,
+           Diplosoma_listerianum=0,
+           Carcinus_maenas=0,
+           across(everything(), as.character))%>%
+    as.data.frame(),
+    mutate(Carcinus_maenas=0,
+           across(everything(), as.character))%>%
+    as.data.frame(),
+    mutate(Membranipora_membranacea=0,
+           Hemigrapsus_sanguineus=0,
+           Didemnum_vexillum=0,
+           Carcinus_maenas=0,
+           across(everything(), as.character))%>%
+    as.data.frame()
 )%>%
-  mutate(Presence="TRUE")%>%
-  unique() %>%
-  dplyr::select(Species,StnLocation,Year, Presence) %>% 
-  dplyr::right_join(metabarcoding_sites,by = "StnLocation") %>% 
-  st_sf()%>%
-  na.omit()
+  dplyr::select(-geometry) %>% 
+  unique()%>%
+  gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
+  group_by(Species,StnLocation,Year) %>% 
+  summarize(Presence = if_else(all(is.na(Presence)),
+                               FALSE,
+                               any(Presence>0,na.rm = TRUE))) %>%
+  ungroup() %>%
+  spread(key = "Species", value = "Presence") %>%
+  right_join(metabarcoding_sites,by = "StnLocation") %>%
+  st_sf() %>% 
+  mutate(StnLocation=gsub("[ \t]+$","",StnLocation))
 
 saveRDS(metabarcoding_sites, "outputdata/metabarcoding_sites.rds")
 saveRDS(metabarcoding, "outputdata/metabarcoding.rds")
@@ -451,14 +464,20 @@ maritimes_tunicate_2024 <- read.csv("recentdata/Final_AIS_tunicate_2006_2024_pre
   st_transform(proj)%>%
   dplyr::select(-cover_index,-province,-stn_num) 
 
+
 maritimes_tunicate_monitor<-rbind(maritimes_tunicate_monitor_1,
                                   maritimes_tunicate_monitor_2,
                                   maritimes_tunicate_2024)%>%
   mutate(Species=gsub(" ","_",species_name))%>%
   dplyr::select(-species_name)%>%
-  mutate(Presence=as.integer(1))%>%
+  mutate(Presence=as.character(1))%>%
+  as.data.frame()%>%
+  #dplyr::select(-geometry)%>% 
+  pivot_wider(id_cols = c(StnLocation,Year, geometry) ,names_from = Species, values_from = Presence)%>%
+  st_as_sf()%>%
   st_transform(proj)
-
+  
+maritimes_tunicate_monitor[is.na(maritimes_tunicate_monitor)]<-"0"
 
 # Gulf Tunicates
 # gulf_tunicate_monitor <- esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Gulf_Region_Aquatic_Invasive_Species_Data/MapServer/0")
@@ -477,7 +496,11 @@ gulf_tunicate_monitor_2020 <- readxl::read_excel("recentdata/Gulf AIS data_biof_
                 "Carcinus_maenas"="C maenas",
                 "Codium_fragile"="C fragile")%>%
   dplyr::select(-Province)%>%
-  st_transform(proj)
+  #mutate(Year=as.character(Year))%>%
+  as.data.frame()
+  # mutate(Juxtacribrilina_mutabilis=as.character("0"),
+  #        Year=as.character(Year))%>%
+  # st_transform(proj)
 
 gulf_tunicate_monitor_2021 <- readxl::read_excel("recentdata/Copy of P-A Table_2021 data_March2022.xlsx") %>% 
   st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
@@ -491,14 +514,22 @@ gulf_tunicate_monitor_2021 <- readxl::read_excel("recentdata/Copy of P-A Table_2
                 "Carcinus_maenas"="C maenas",
                 "Codium_fragile"="C fragile")%>%
   dplyr::select(-Province)%>%
-  st_transform(proj)
+  #mutate(Year=as.character(Year))%>%
+  as.data.frame()
+  # mutate(Juxtacribrilina_mutabilis=as.character("0"),
+  #        Year=as.character(Year))%>%
+  # st_transform(proj)
 
 gulf_tunicate_monitor_2022 <- readxl::read_excel("recentdata/Copy of 2022 P-A Data_AIS monitoring_Gulf Region_Jan2023.xlsx") %>% 
   st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
   dplyr::rename(StnLocation=Station_Name)%>%
-  dplyr::select(-Date_In, -Date_Out, -Province) %>%
   mutate(Year=2022)%>%
-  st_transform(proj)
+  dplyr::select(-Date_In, -Date_Out, -Province) %>%
+   #mutate(Year=as.character(Year))%>%
+  as.data.frame()
+  # mutate(Juxtacribrilina_mutabilis=as.character("0"),
+  #        Year=as.character(Year))%>%
+  # st_transform(proj)
 
 #missing data for 2023 from Gulf
 
@@ -516,15 +547,19 @@ gulf_tunicate_montior_2024<-readxl::read_excel("recentdata/Gulf 2024 AIS Data_Fe
                 "Codium_fragile"="C fragile",
                 "Juxtacribrilina_mutabilis"="J mutabilis"
                 )%>%
-  dplyr::select(-Province, -Comments)%>%
+   dplyr::select(-Province, -Comments)%>%
+  as.data.frame()
+  
+
+gulf_tunicate_monitor<-bind_rows(gulf_tunicate_monitor_2020,
+                             gulf_tunicate_monitor_2021,
+                             gulf_tunicate_monitor_2022)
+
+gulf_tunicate_monitor<-rbind(gulf_tunicate_monitor%>%mutate(Juxtacribrilina_mutabilis=0),
+                             gulf_tunicate_montior_2024)%>%
+  st_as_sf()%>%
   st_transform(proj)
 
-gulf_tunicate_monitor<-rbind(gulf_tunicate_incidental_2020,
-                             gulf_tunicate_incidental_2021,
-                             gulf_tunicate_incidental_2023,
-                             gulf_tunicate_incidental_2024)%>%
-  mutate(Presence=as.integer(Presence))%>%
-  dplyr::select(-prov)
   
 
 monitoring_sites <- rbind(maritimes_tunicate_monitor%>% 
@@ -543,19 +578,24 @@ monitoring_sites <- rbind(maritimes_tunicate_monitor%>%
   st_transform(proj)
 
 monitoring <- rbind(maritimes_tunicate_monitor%>%
+                      mutate(Carcinus_maenas=0,
+                             Codium_fragile=0)%>%
                           as.data.table(),
                         gulf_tunicate_monitor %>% 
+                      mutate(Ascidiella_aspersa=0,
+                             Didemnum_vexillum=0,
+                             Diplosoma_listerianum=0)%>%
                           as.data.table()) %>% 
   dplyr::select(-geometry) %>% 
   unique()%>%
-  #gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
+  gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
   group_by(Species,StnLocation,Year) %>% 
   #unique()%>%
   summarize(Presence = if_else(all(is.na(Presence)),
                                FALSE,
                                any(Presence>0,na.rm = TRUE))) %>%
   ungroup() %>%
-  #spread(key = "Species", value = "Presence") %>%
+  spread(key = "Species", value = "Presence") %>%
   right_join(monitoring_sites,by = "StnLocation") %>%
   st_sf() %>% 
   mutate(StnLocation=gsub("[ \t]+$","",StnLocation))

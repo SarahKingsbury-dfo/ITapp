@@ -239,14 +239,15 @@ server <- function(input, output, session) {
       dplyr::filter(Year>=input$monitoringyear) %>% 
       as.data.table() %>% 
       dplyr::select(-geometry) %>% 
-      gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
+      gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
       group_by(Species,StnLocation) %>% 
       summarize(
+        #History=case_when(Presence=="TRUE"~paste("Detected in", paste(Year, collapse=",")))
         History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
-                          length(Year)>input$monitoringstrikes&all(!tail(Presence,input$monitoringstrikes)) ~ paste0("Likely failed to establish, detected in: ",
-                                                                                                                     paste(Year[Presence],collapse = ", "),
-                                                                                                                     ", and not detected in: ",
-                                                                                                                     paste(Year[!Presence],collapse = ", ")),
+        length(Year)>input$monitoringstrikes&all(!tail(Presence,input$monitoringstrikes)) ~ paste0("Likely failed to establish, detected in: ",
+                                                                                                   paste(Year[Presence],collapse = ", "),
+                                                                                                   ", and not detected in: ",
+                                                                                                   paste(Year[!Presence],collapse = ", ")),
                           any(!Presence)~paste0("Detected in: ",
                                                 paste(Year[Presence],collapse = ", "),
                                                 ", and not detected in: ",
@@ -257,8 +258,9 @@ server <- function(input, output, session) {
                                    any(Presence>0,na.rm = TRUE))
         ) %>% 
       ungroup() %>% 
-      mutate(Presence=as.character(Presence)) %>%  
-      tidyr::pivot_longer(cols = c(Presence,History)) %>% 
+      mutate(Presence=as.character(Presence)) %>%
+      #tidyr::pivot_longer(cols = c(History)) %>% 
+      tidyr::pivot_longer(cols = c(Presence,History)) %>%
       tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
       inner_join(monitoring_sites,by = "StnLocation")
   })
@@ -269,11 +271,12 @@ server <- function(input, output, session) {
     metabarcoding %>% 
       as.data.table() %>% 
       dplyr::select(-geometry) %>%
-      gather(key = "Species", value = "Presence",-StnLocation,-Year) %>% 
+      gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
       group_by(Species,StnLocation) %>% 
-      # mutate(Species=(as.character(Species)), 
-      #        Presence=(as.character(Presence)))%>%
+      mutate(Species=(as.character(Species)),
+             Presence=(as.character(Presence)))%>%
       summarize(
+        #History=case_when(Presence=="TRUE"~paste("Detected in", paste(Year, collapse=",")))
         History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
                           any(!Presence)~paste0("Detected in: ",
                                                 paste(Year[Presence],collapse = ", "),
@@ -285,8 +288,9 @@ server <- function(input, output, session) {
                            any(Presence>0,na.rm = TRUE))
       ) %>% 
       ungroup() %>% 
-      mutate(Presence=as.character(Presence)) %>%  
-      tidyr::pivot_longer(cols = c(Presence,History)) %>% 
+      #tidyr::pivot_longer(cols = c(History)) %>% 
+      mutate(Presence=as.character(Presence)) %>%
+      tidyr::pivot_longer(cols = c(Presence,History)) %>%
       tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
       inner_join(metabarcoding_sites,by = "StnLocation")
   })
@@ -330,13 +334,15 @@ server <- function(input, output, session) {
   # functions for updating UI
   
   update_orig_sites <- function(lease,prov){
-   # browser()
+    #browser()
 
     if(input$origmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                         prov,
-                                        monitoring_filtered() %>% filter(name=="Presence") %>% 
-                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                        monitoring_filtered() %>% filter(name=="History") %>% 
+                                        # monitoring_filtered() %>% filter(name=="Presence") %>% 
+                                          dplyr::select(-name), 
+                                        #%>% mutate(across(2:(ncol(.)-1),as.logical)),
                                         as.numeric(input$origmonitoringnum),
                                         monitoring_dist_orig())
       
@@ -368,8 +374,10 @@ server <- function(input, output, session) {
     if(input$destmonitoringnum!=""){
       nearestmonitoring <- nearestsites(lease,
                                         prov,
-                                        monitoring_filtered() %>% filter(name=="Presence") %>% 
-                                          dplyr::select(-name) %>% mutate(across(2:(ncol(.)-1),as.logical)),
+                                        monitoring_filtered() %>% filter(name=="History") %>% 
+                                        # monitoring_filtered() %>% filter(name=="Presence") %>% 
+                                          dplyr::select(-name), 
+                                        #%>% mutate(across(2:(ncol(.)-1),as.logical)),
                                         as.numeric(input$destmonitoringnum),
                                         monitoring_dist_dest())
       
