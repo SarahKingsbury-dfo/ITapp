@@ -1,4 +1,4 @@
-if(!require("shiny")) install.packages("shiny")
+#if(!require("shiny")) install.packages("shiny")
 if(!require("sf")) install.packages("sf")
 if(!require("leaflet")) install.packages("leaflet")
 if(!require("leaflet.minicharts")) install.packages("leaflet.minicharts")
