@@ -242,7 +242,6 @@ server <- function(input, output, session) {
       gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
       group_by(Species,StnLocation) %>% 
       summarize(
-        #History=case_when(Presence=="TRUE"~paste("Detected in", paste(Year, collapse=",")))
         History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
         length(Year)>input$monitoringstrikes&all(!tail(Presence,input$monitoringstrikes)) ~ paste0("Likely failed to establish, detected in: ",
                                                                                                    paste(Year[Presence],collapse = ", "),
@@ -259,7 +258,6 @@ server <- function(input, output, session) {
         ) %>% 
       ungroup() %>% 
       mutate(Presence=as.character(Presence)) %>%
-      #tidyr::pivot_longer(cols = c(History)) %>% 
       tidyr::pivot_longer(cols = c(Presence,History)) %>%
       tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
       inner_join(monitoring_sites,by = "StnLocation")
@@ -273,10 +271,7 @@ server <- function(input, output, session) {
       dplyr::select(-geometry) %>%
       gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
       group_by(Species,StnLocation) %>% 
-      mutate(Species=(as.character(Species)),
-             Presence=(as.character(Presence)))%>%
       summarize(
-        #History=case_when(Presence=="TRUE"~paste("Detected in", paste(Year, collapse=",")))
         History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
                           any(!Presence)~paste0("Detected in: ",
                                                 paste(Year[Presence],collapse = ", "),
@@ -288,7 +283,6 @@ server <- function(input, output, session) {
                            any(Presence>0,na.rm = TRUE))
       ) %>% 
       ungroup() %>% 
-      #tidyr::pivot_longer(cols = c(History)) %>% 
       mutate(Presence=as.character(Presence)) %>%
       tidyr::pivot_longer(cols = c(Presence,History)) %>%
       tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
