@@ -190,7 +190,7 @@ ui <- navbarPage(
                     )
              )
            ),
-           textAreaInput("response","Suggested Response (Experimental)","No suggested response generated (yet)",width = "100%",resize = "vertical"),
+           textAreaInput("response","Suggested Response (Use in combination with Table 2)","No suggested response generated (yet)",width = "100%",resize = "vertical"),
            h3("Supportive Tables"),
            tableOutput("species"),
            tableOutput("mitigation"),
@@ -821,16 +821,16 @@ server <- function(input, output, session) {
     if(!is.null(input$consideration)){
       if(all(input$consideration==c("Land-based origin","Land-based destination"))){
         summarymitigation <- data.frame(
-          Site = "The risk for AIS/FFHPP/SARP is considered low with high certainty because the origin and destination sites are land-based. However, precautions should be taken to ensure no escapes or accidental introductions occur. It is recommended that all equipment used to capture, rear, hold, or transport the species  (and associated water used in transfer) should be cleaned, drained, dried, and decontaminated prior to use elsewhere. Approval of introduction & transfer requests do not preclude individuals from their responsibilities to ensure no introductions of non-indigenous species (including species that are common to Nova Scotia but from a different genetic strain) to areas they are not indigenous to as states under the Aquatic Invasive Species Regulations s. 10. ")
+          Site = "The risk for AIS/FFHPP is considered low with high certainty because the origin and destination sites are land-based. However, precautions should be taken to ensure no escapes or accidental introductions occur. It is recommended that all equipment used to capture, rear, hold, or transport the species  (and associated water used in transfer) should be cleaned, drained, dried, and decontaminated prior to use elsewhere. Approval of introduction & transfer requests do not preclude individuals from their responsibilities to ensure no introductions of non-indigenous species (including species that are common to Nova Scotia but from a different genetic strain) to areas they are not indigenous to as states under the Aquatic Invasive Species Regulations s. 10. ")
       } else if(input$consideration=="Land-based origin"){
         if(!input$product %in% sp_mitigation$Common_Name){
           summarymitigation <- data.frame(
-            Site = "The risk for AIS/FFHPP/SARP is considered low with high certainty because the origin site is land-based")
+            Site = "The risk for AIS/FFHPP is considered low with high certainty because the origin site is land-based")
         }
         
       } else if(input$consideration=="Land-based destination"){
         summarymitigation <- data.frame(
-          Site = "The risk for AIS/FFHPP/SARP is considered low with high certainty because the destination site is land-based. However, precautions should be taken to ensure no escapes or accidental introductions occur. It is recommended that all equipment used to capture, rear, hold, or transport the species  (and associated water used in transfer) should be cleaned, drained, dried, and decontaminated prior to use elsewhere. Approval of introduction & transfer requests do not preclude individuals from their responsibilities to ensure no introductions of non-indigenous species (including species that are common to Nova Scotia but from a different genetic strain) to areas they are not indigenous to as states under the Aquatic Invasive Species Regulations s. 10. ")
+          Site = "The risk for AIS/FFHPP is considered low with high certainty because the destination site is land-based. However, precautions should be taken to ensure no escapes or accidental introductions occur. It is recommended that all equipment used to capture, rear, hold, or transport the species  (and associated water used in transfer) should be cleaned, drained, dried, and decontaminated prior to use elsewhere. Approval of introduction & transfer requests do not preclude individuals from their responsibilities to ensure no introductions of non-indigenous species (including species that are common to Nova Scotia but from a different genetic strain) to areas they are not indigenous to as states under the Aquatic Invasive Species Regulations s. 10. ")
       } else {
         summarymitigation <- data.frame(
           Site = "This (combination of) consideration(s) is not resolved in this app")
@@ -843,7 +843,7 @@ server <- function(input, output, session) {
     
   },
   caption.placement="top",
-  caption="Table 2: Applicable 'fellow-traveller' mitigation strategies")
+  caption="Table 2: Applicable 'fellow-traveller' mitigation strategies. Responses based on Masse-Beaulne et al. (2025). AIS mitigrations were selected based on high to moderate certainty of effectiveness, except for green crab that had limit options.")
   
   output$history <- renderTable({
     # browser()
