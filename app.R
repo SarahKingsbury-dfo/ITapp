@@ -1,8 +1,11 @@
-#if(!require("shiny")) install.packages("shiny")
+if(!require("shiny")) install.packages("shiny")
 if(!require("sf")) install.packages("sf")
+if(!require("esri2sf"))install.packages("esri2sf")
+if(!require("jsonlite"))install.packages("jsonlite")
 if(!require("leaflet")) install.packages("leaflet")
 if(!require("leaflet.minicharts")) install.packages("leaflet.minicharts")
 if(!require("data.table")) install.packages("data.table")
+if(!require("markdown")) install.packages("markdown")
 if(!require("tidyverse")) install.packages("tidyverse")
 
 #### global variables ####
@@ -14,40 +17,48 @@ proj <- "+proj=longlat +datum=WGS84"
 if(!file.exists("spatialdata/NS.rds")){
   if(!require("devtools")) install.packages("devtools")
   if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
-  NS <- esri2sf::esri2sf('https://services.arcgis.com/nQHSMRVltyfsxeFe/ArcGIS/rest/services/Marine_Lease_Boundary_Database_Shellfish_View/FeatureServer/0') %>% 
-    filter(grepl("Issued",SiteStatus)|grepl("Propose",SiteStatus)|grepl("Approved Option",SiteStatus)) %>%
-    # filter(SiteStatus=="Issued") %>% 
-    mutate(Lease_Identifier=License_Lease_Num) %>% 
-    st_transform(proj) %>% 
-    rename(geometry=geoms)
-  
+  # NS <- esri2sf::esri2sf('https://services.arcgis.com/nQHSMRVltyfsxeFe/ArcGIS/rest/services/Marine_Lease_Boundary_Database_Shellfish_View/FeatureServer/0') %>% 
+    # filter(grepl("Issued",SiteStatus)|grepl("Propose",SiteStatus)|grepl("Approved Option",SiteStatus)) %>%
+    # # filter(SiteStatus=="Issued") %>%
+    # mutate(Lease_Identifier=License_Lease_Num) %>%
+    # st_transform(proj) %>%
+    # rename(geometry=geoms)
+
+#New Nova Scotia Aquaculture lease sites downloaded from https://ouvert.canada.ca/data/dataset/bf6287be-3fd1-db4d-60a4-7d80abc996cb/resource/bd83f1d3-9694-4b29-9aa6-bb4c40a1e8ce
+  NS<-sf::read_sf('spatialdata/tempdata_shp/geo_export_1f1e3956-3190-4fc6-871b-706757deb026.shp')%>%
+    #filter(grepl("Issued",SiteStatus)|grepl("Propose",SiteStatus)|grepl("Approved Option",SiteStatus)) %>% #Now only contains Issued and Issued Experimental
+    # filter(SiteStatus=="Issued") %>%
+    mutate(Lease_Identifier=license_le) %>%
+    st_transform(proj)
+    
   NB <- bind_rows(esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/0') %>% rename(Lease_Identifier = MSNO),
                   esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/1') %>% rename(Lease_Identifier = LPNO),
                   esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/2') %>% rename(Lease_Identifier = MSNO)) %>% 
     st_transform(proj) %>% 
     rename(geometry=geoms)
 
-  raw <- jsonlite::read_json(
-    "https://www.arcgis.com/sharing/rest/content/items/16aa8830c7084a8a92ce066b525978b4/data",
-    simplifyVector = FALSE
-  )
-  
-  features <- c(raw$operationalLayers[[1]]$featureCollection$layers[[1]]$featureSet$features,
-                raw$operationalLayers[[2]]$featureCollection$layers[[1]]$featureSet$features,
-                raw$operationalLayers[[3]]$featureCollection$layers[[1]]$featureSet$features)
-  
-  PEI <- lapply(features, "[[", "attributes") %>% 
-    lapply(as_tibble) %>% 
-    bind_rows() %>% 
-    mutate(geometry = esri2sf:::esri2sfPolygon(features)) %>% 
-    st_as_sf() %>% 
-    st_set_crs(features[[1]]$geometry$spatialReference$latestWkid)%>% 
-    mutate(Lease_Identifier=Lease) %>% 
-    st_transform(proj)
+  #As of March 2025, no open source PEI lease mapping layers are available. WIll need to rely on the existing layer. 
+  # raw <- jsonlite::read_json(
+  #   "https://www.arcgis.com/sharing/rest/content/items/16aa8830c7084a8a92ce066b525978b4/data",
+  #   simplifyVector = FALSE
+  # )
+  # 
+  # features <- c(raw$operationalLayers[[1]]$featureCollection$layers[[1]]$featureSet$features,
+  #               raw$operationalLayers[[2]]$featureCollection$layers[[1]]$featureSet$features,
+  #               raw$operationalLayers[[3]]$featureCollection$layers[[1]]$featureSet$features)
+  # 
+  # PEI <- lapply(features, "[[", "attributes") %>% 
+  #   lapply(as_tibble) %>% 
+  #   bind_rows() %>% 
+  #   mutate(geometry = esri2sf:::esri2sfPolygon(features)) %>% 
+  #   st_as_sf() %>% 
+  #   st_set_crs(features[[1]]$geometry$spatialReference$latestWkid)%>% 
+  #   mutate(Lease_Identifier=Lease) %>% 
+  #   st_transform(proj)
   
   saveRDS(NS,"spatialdata/NS.rds")
   saveRDS(NB,"spatialdata/NB.rds")
-  saveRDS(PEI,"spatialdata/PEI.rds")
+ # saveRDS(PEI,"spatialdata/PEI.rds")
   
   
 }
@@ -69,9 +80,9 @@ sp_mitigation <- read.csv("mitigation.csv",stringsAsFactors = FALSE)
 product_sp <- as.list(c(unique(sp_treatments$Product_treated),
                         unique(sp_mitigation$Common_Name)))
 
-if(!file.exists("outputdata/pei_monitoring_dist.rds")){
-  source("prepare_data.R")
-}
+# if(!file.exists("outputdata/pei_monitoring_dist.rds")){
+#   source("prepare_data.R")
+# }
 
 publicdata_sites <- readRDS("outputdata/publicdata_sites.rds")
 publicdata <- readRDS("outputdata/publicdata.rds")
@@ -92,11 +103,11 @@ pei_monitoring_dist <- readRDS("outputdata/pei_monitoring_dist.rds")
 pei_metabarcoding_dist<-readRDS("outputdata/pei_metabarcoding_dist.rds")
 
 
-greenCrabIcon <- makeIcon(
-  iconUrl = "GreenCrab.png",
-  iconWidth = 50,
-  iconHeight = 37
-)
+# greenCrabIcon <- makeIcon(
+#   iconUrl = "GreenCrab.png",
+#   iconWidth = 50,
+#   iconHeight = 37
+# )
 
 # html_legend <- paste0("<img src='",getwd(),"/",greenCrabIcon$iconUrl,"'>  Green Crab")
 
