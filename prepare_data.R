@@ -431,6 +431,7 @@ maritimes_tunicate_monitor_1 <- rbind(
   )%>%
   dplyr::rename(geometry=geoms,Year = year, StnLocation=stn_location)%>% 
   st_transform(proj) %>% 
+  filter(cover_index=="1")%>%
   dplyr::select(-OBJECTID,-latitude,-longitude,-cover_index,-province,-stn_num)
 
 maritimes_tunicate_monitor_2 <- rbind(
@@ -453,12 +454,13 @@ maritimes_tunicate_monitor_2 <- rbind(
 )%>%
   dplyr::rename(geometry=geoms,Year = year, StnLocation=stn_location)%>% 
   st_transform(proj) %>% 
-  dplyr::select(-OBJECTID,-latitude,-longitude,-cover_index,-province,-stn_num)
+  filter(cover_index=="1")%>%
+  dplyr::select(-OBJECTID,-latitude,-longitude,-province,-stn_num, -cover_index)
 
 #the 2024 data is not yet availabel online and must be entered manually
                                 
 maritimes_tunicate_2024 <- read.csv("recentdata/Final_AIS_tunicate_2006_2024_present_absent_long.csv")%>%
-  filter(year=="2024")%>%
+  filter(year=="2024" & cover_index=="1")%>%
   st_as_sf(coords=c('longitude','latitude'),crs=4326)%>%
   dplyr::rename(species_name=species.name,Year = year, StnLocation=stn.location)%>%
   st_transform(proj)%>%
@@ -583,7 +585,6 @@ monitoring <- rbind(maritimes_tunicate_monitor%>%
                           as.data.table(),
                         gulf_tunicate_monitor %>% 
                       mutate(Ascidiella_aspersa=0,
-                             Didemnum_vexillum=0,
                              Diplosoma_listerianum=0)%>%
                           as.data.table()) %>% 
   dplyr::select(-geometry) %>% 
