@@ -20,7 +20,6 @@ equidist <- "+proj=eqdc +lon_0=-63.59 +lat_1=43.92 +lat_2=48.33 +lat_0=46.13 +x_
 sf_use_s2(FALSE)
 
 
-
 NS <- readRDS("spatialdata/NS.rds")
 NB <- readRDS("spatialdata/NB.rds")
 PEI <- readRDS("spatialdata/PEI.rds")
@@ -499,7 +498,8 @@ gulf_tunicate_monitor_2020 <- readxl::read_excel("recentdata/Gulf AIS data_biof_
                 "Codium_fragile"="C fragile")%>%
   dplyr::select(-Province)%>%
   #mutate(Year=as.character(Year))%>%
-  as.data.frame()
+  #as.data.frame()%>%
+  st_transform(proj)
   # mutate(Juxtacribrilina_mutabilis=as.character("0"),
   #        Year=as.character(Year))%>%
   # st_transform(proj)
@@ -517,10 +517,10 @@ gulf_tunicate_monitor_2021 <- readxl::read_excel("recentdata/Copy of P-A Table_2
                 "Codium_fragile"="C fragile")%>%
   dplyr::select(-Province)%>%
   #mutate(Year=as.character(Year))%>%
-  as.data.frame()
+  #as.data.frame()
   # mutate(Juxtacribrilina_mutabilis=as.character("0"),
   #        Year=as.character(Year))%>%
-  # st_transform(proj)
+   st_transform(proj)
 
 gulf_tunicate_monitor_2022 <- readxl::read_excel("recentdata/Copy of 2022 P-A Data_AIS monitoring_Gulf Region_Jan2023.xlsx") %>% 
   st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
@@ -528,10 +528,10 @@ gulf_tunicate_monitor_2022 <- readxl::read_excel("recentdata/Copy of 2022 P-A Da
   mutate(Year=2022)%>%
   dplyr::select(-Date_In, -Date_Out, -Province) %>%
    #mutate(Year=as.character(Year))%>%
-  as.data.frame()
+  #as.data.frame()
   # mutate(Juxtacribrilina_mutabilis=as.character("0"),
   #        Year=as.character(Year))%>%
-  # st_transform(proj)
+   st_transform(proj)
 
 #missing data for 2023 from Gulf
 
@@ -550,12 +550,14 @@ gulf_tunicate_montior_2024<-readxl::read_excel("recentdata/Gulf 2024 AIS Data_Fe
                 "Juxtacribrilina_mutabilis"="J mutabilis"
                 )%>%
    dplyr::select(-Province, -Comments)%>%
-  as.data.frame()
+  #as.data.frame()
+  st_transform(proj)
   
 
 gulf_tunicate_monitor<-bind_rows(gulf_tunicate_monitor_2020,
                              gulf_tunicate_monitor_2021,
-                             gulf_tunicate_monitor_2022)
+                             gulf_tunicate_monitor_2022)%>%
+  st_transform(proj)
 
 gulf_tunicate_monitor<-rbind(gulf_tunicate_monitor%>%mutate(Juxtacribrilina_mutabilis=0),
                              gulf_tunicate_montior_2024)%>%
@@ -571,7 +573,7 @@ monitoring_sites <- rbind(maritimes_tunicate_monitor%>%
                           ) %>% 
   group_by(StnLocation) %>% 
   summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
-  unique() %>% 
+  #unique() %>% 
   mutate(StnLocation=gsub("[ \t]+$","",StnLocation)) %>% 
   st_transform(equidist) %>% 
   filter(geometry%>% 
