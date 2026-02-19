@@ -19,9 +19,21 @@ proj <- "+proj=longlat +datum=WGS84"
 equidist <- "+proj=eqdc +lon_0=-63.59 +lat_1=43.92 +lat_2=48.33 +lat_0=46.13 +x_0=1000000 +y_0=1000000 +datum=WGS84 +units=m +no_defs"
 sf_use_s2(FALSE)
 
+# NS<-st_read("spatialdata/NS_Aqua_lease_2026/geo_export_95bfaf74-c1b7-4c65-a258-d1cb7076637e.shp")%>%
+#   mutate(Lease_Identifier=license_le)
+#saveRDS(NS, "spatialdata/NS.rds")
+
+# NB_shell<-st_read("spatialdata/NB_lease/Shellfish.geojson")%>%
+#   mutate(Lease_Identifier=SITE_NUMBER)%>%
+#   select(-"CULTIVATION_METHOD")
+# NB_finfish<-st_read("spatialdata/NB_lease/Finfish.geojson")%>%
+#   mutate(Lease_Identifier=SITE_NUMBER)
+# NB<-rbind(NB_shell, NB_finfish)
+# saveRDS(NB, "spatialdata/NB.rds")
+
 
 NS <- readRDS("spatialdata/NS.rds")
-NB <- readRDS("spatialdata/NB.rds")
+NB<- readRDS("spatialdata/NB.rds")
 PEI <- readRDS("spatialdata/PEI.rds")
 
 species <- read.csv("commonnames.csv")
