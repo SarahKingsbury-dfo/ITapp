@@ -417,9 +417,11 @@ metabarcoding<-bind_rows(
            Carcinus_maenas=0,
            across(everything(), as.character))%>%
     as.data.frame(),
+    eDNA_2023%>%
     mutate(Carcinus_maenas=0,
            across(everything(), as.character))%>%
     as.data.frame(),
+  eDNA_2024%>%
     mutate(Membranipora_membranacea=0,
            Hemigrapsus_sanguineus=0,
            Didemnum_vexillum=0,
@@ -507,10 +509,17 @@ maritimes_tunicate_2024 <- read.csv("recentdata/Final_AIS_tunicate_2006_2024_pre
   st_transform(proj)%>%
   dplyr::select(-cover_index,-province,-stn_num) 
 
+maritimes_tunicate_2025 <- read.csv("recentdata/Final_AIS_tunicate_2006_2025_present_absent_long_Feb_4th_2026.csv")%>%
+  filter(year=="2025" & cover_index=="1")%>%
+  st_as_sf(coords=c('longitude','latitude'),crs=4326)%>%
+  dplyr::rename(species_name=species.name,Year = year, StnLocation=stn.location)%>%
+  st_transform(proj)%>%
+  dplyr::select(-cover_index,-province,-stn_num) 
 
 maritimes_tunicate_monitor<-rbind(maritimes_tunicate_monitor_1,
                                   maritimes_tunicate_monitor_2,
-                                  maritimes_tunicate_2024)%>%
+                                  maritimes_tunicate_2024,
+                                  maritimes_tunicate_2025)%>%
   mutate(Species=gsub(" ","_",species_name))%>%
   dplyr::select(-species_name)%>%
   mutate(Presence=as.character(1))%>%
@@ -595,14 +604,34 @@ gulf_tunicate_montior_2024<-readxl::read_excel("recentdata/Gulf 2024 AIS Data_Fe
   #as.data.frame()
   st_transform(proj)
   
+gulf_tunicate_montior_2025<-readxl::read_excel("recentdata/Gulf 2025 AIS Data_Science Gulf_Feb2026.xlsx", sheet=1, col_types = 'text') %>% 
+  filter(!Latitude=="NA")%>%
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
+  dplyr::rename(StnLocation="Station Name",
+                "Botryllus_schlosseri"="B. schlosseri",
+                "Botrylloides_violaceus"="B. violaceus",
+                "Ciona_intestinalis"="C. intestinalis",
+                "Styela_clava"="S. clava",
+                "Caprella_mutica"="C. mutica",
+                "Membranipora_membranacea"="M. membranacea", 
+                "Carcinus_maenas"="C. maenas",
+                "Codium_fragile"="C. fragile",
+                "Juxtacribrilina_mutabilis"="J. mutabilis",
+                "Fucus_serratus"="F. serratus",
+                "Diadumene_lineata"="D. lineata",
+  )%>%
+  dplyr::select(-Province, -Comments)%>%
+  #as.data.frame()
+  st_transform(proj)
 
 gulf_tunicate_monitor<-bind_rows(gulf_tunicate_monitor_2020,
                              gulf_tunicate_monitor_2021,
                              gulf_tunicate_monitor_2022)%>%
   st_transform(proj)
 
-gulf_tunicate_monitor<-rbind(gulf_tunicate_monitor%>%mutate(Juxtacribrilina_mutabilis=0),
-                             gulf_tunicate_montior_2024)%>%
+gulf_tunicate_monitor<-rbind(gulf_tunicate_monitor%>%mutate(Juxtacribrilina_mutabilis=0, Fucus_serratus=0, Diadumene_lineata=0),
+                             gulf_tunicate_montior_2024%>%mutate(Fucus_serratus=0, Diadumene_lineata=0),
+                             gulf_tunicate_montior_2025)%>%
   st_as_sf()%>%
   st_transform(proj)
 
@@ -625,11 +654,15 @@ monitoring_sites <- rbind(maritimes_tunicate_monitor%>%
 
 monitoring <- rbind(maritimes_tunicate_monitor%>%
                       mutate(Carcinus_maenas=0,
-                             Codium_fragile=0)%>%
+                             Codium_fragile=0,
+                             Fucus_serratus=0,
+                             Diadumene_lineata=0)%>%
                           as.data.table(),
                         gulf_tunicate_monitor %>% 
                       mutate(Ascidiella_aspersa=0,
-                             Diplosoma_listerianum=0)%>%
+                             Diplosoma_listerianum=0,
+                             Didemnum_vexillum=0,
+                             Tricellaria_inopinata=0)%>%
                           as.data.table()) %>% 
   dplyr::select(-geometry) %>% 
   unique()%>%
