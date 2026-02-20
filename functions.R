@@ -49,104 +49,40 @@ nearestsites <- function(lease,prov,sites,n,distmat){
   
 }
 
+species_palette <- c(
+  Didemnum_vexillum          = "#2C7FB8",  # blue
+  Botryllus_schlosseri       = "#41B6C4",  # teal
+  Botrylloides_violaceus     = "#6A51A3",  # purple
+  Diplosoma_listerianum      = "#9E9AC8",  # lavender
+  Ciona_intestinalis         = "#1B9E77",  # green-teal
+  Styela_clava               = "#66C2A4",  # pale teal
+  Ascidiella_aspersa         = "#238B45",  # green
+  Caprella_mutica            = "#A1D99B",  # light green
+  
+  Carcinus_maenas            = "#B35806",  # brown-orange
+  Codium_fragile             = "#FDB863",  # pale orange
+  Membranipora_membranacea   = "#E08214",  # orange
+  Hemigrapsus_sanguineus     = "#D7301F",  # red
+  Oncorhynchus_mykiss        = "#EF6548",  # coral
+  Argopecten_irradians       = "#FB9A99",  # light red
+  
+  Ostrea_edulis              = "#8C510A",  # dark brown
+  Juxtacribrilina_mutabilis  = "#DFC27D",  # sand
+  Sargassum_muticum          = "#7F3B08",  # deep brown
+  Tricellaria_inopinata      = "#542788",  # deep purple
+  Fucus_serratus             = "#01665E",  # dark teal
+  Diadumene_lineata          = "#80CDC1"   # pale blue-green
+)
+
 #### basemap ####
 basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
-  #browser()
-
-  # IncidentalIcons <- iconList(
-  #   "Argopecten_irradians" = makeIcon(
-  #     iconUrl = "mussel.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Ascidiella_aspersa" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Botrylloides_violaceus" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Botryllus_schlosseri" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Caprella_mutica" = makeIcon(
-  #     iconUrl = "skeletonshrimp.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Carcinus_maenas" = makeIcon(
-  #     iconUrl = "GreenCrab.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Ciona_intestinalis" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Codium_fragile" = makeIcon(
-  #     iconUrl = "algae.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Didemnum_vexillum" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Diplosoma_listerianum" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Hemigrapsus_sanguineus" = makeIcon(
-  #     iconUrl = "blackCrab.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Membranipora_membranacea" = makeIcon(
-  #     iconUrl = "algae.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Oncorhynchus_mykiss" = makeIcon(
-  #     iconUrl = "trout.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Ostrea_edulis" = makeIcon(
-  #     iconUrl = "mussel.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Styela_clava" = makeIcon(
-  #     iconUrl = "blackCrab.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15)
-    # "Procambarus_clarkii"=makeIcon(
-    #   iconUrl="crayfish.png",
-    #   iconWidth = 30,
-    #   iconHeight = 15),
-    # "Esox_niger"=makeIcon(
-    #   iconUrl="pike.png",
-    #   iconWidth = 30,
-    #   iconHeight = 15),
-    # "Micopterus_dolomieu"=makeIcon(
-    #   iconUrl="trout.png",
-    #   iconWidth = 30,
-    #   iconHeight = 15),
-    # "Cipangopaludina_chinensis"=makeIcon(
-    #   iconUrl="snail.png",
-    #   iconWidth = 30,
-    #   iconHeight = 15),
-    # "Carassius_auratus"=makeIcon(
-    #   iconUrl="goldfish.png",
-    #   iconWidth = 30,
-    #   iconHeight = 15)
-  #)
-  
-  # if(!all(incidentals$Species %in% names(IncidentalIcons))){
-  #   warning(paste0("basemap() in functions.R does not have a logo associated with: ",
-  #                  unique(incidentals$Species[!incidentals$Species %in% names(IncidentalIcons)]),
-  #                  collapse="\n"))
- # }
-
-
   
  #browser()
+  
   sp <- monitoringsp[monitoringsp %in% names(monitoring)]
 
+  palette_for_minicharts <- species_palette[sp]
+  
   leaflet(leases,...) %>%
     addTiles() %>%
     addPolygons(popup = paste("Lease:",leases$Lease_Identifier),group = "Leases") %>%
@@ -158,17 +94,11 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
                      fillColor = 'black',
                      color = 'darkgrey',
                      fillOpacity = 0.7)%>%
-    # addMarkers(data=incidentals$geometry,
-    #            icon = IncidentalIcons[as.numeric(factor(incidentals$Species,levels=sort(monitoringsp)))],
-    #            group = incidentals$Species
-    #            #popup = incidentals$link
-    #            ) %>%
     addMinicharts(st_coordinates(monitoring$geometry)[,1],
                   st_coordinates(monitoring$geometry)[,2],
                   type="pie",
                   chartdata=as.data.frame(monitoring)[,sp],
-                  #layerId= monitoring,
-                  #colorPalette = d3.schemeCategory10,
+                  colorPalette = unname(palette_for_minicharts),
                   legend = TRUE,
                   legendPosition = 'topright') %>%
     addLayersControl(overlayGroups = c("Leases",incidentals$Species),
@@ -180,6 +110,8 @@ basemap_eDNA <- function(leases, metabarcoding, metabarcodingsp,...){
   #browser()
   sp_eDNA <- metabarcodingsp[metabarcodingsp %in% names(metabarcoding)]
   
+  palette_for_minicharts_eDNA <- species_palette[sp_eDNA]
+  
   leaflet(leases,...) %>%
     addTiles() %>%
     addPolygons(popup = paste("Lease:",leases$Lease_Identifier),group = "Leases") %>%
@@ -187,6 +119,7 @@ basemap_eDNA <- function(leases, metabarcoding, metabarcodingsp,...){
                   st_coordinates(metabarcoding$geometry)[,2],
                   type="pie",
                   chartdata=as.data.frame(metabarcoding)[,sp_eDNA],
+                  colorPalette = unname(palette_for_minicharts_eDNA),
                   legend = TRUE,
                   legendPosition = 'topright') %>%
     addLayersControl(overlayGroups = c("Leases"),
@@ -198,74 +131,6 @@ basemap_eDNA <- function(leases, metabarcoding, metabarcodingsp,...){
 basemap_pReport<- function(leases, publicdata, publicdatasp,...){
   
  # browser()
-  # publicIcons <- iconList(
-  #   "Argopecten_irradians" = makeIcon(
-  #     iconUrl = "mussel.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Ascidiella_aspersa" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Botrylloides_violaceus" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Botryllus_schlosseri" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Caprella_mutica" = makeIcon(
-  #     iconUrl = "skeletonshrimp.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Carcinus_maenas" = makeIcon(
-  #     iconUrl = "GreenCrab.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Ciona_intestinalis" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Codium_fragile" = makeIcon(
-  #     iconUrl = "algae.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Didemnum_vexillum" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Diplosoma_listerianum" = makeIcon(
-  #     iconUrl = "tunicate.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Hemigrapsus_sanguineus" = makeIcon(
-  #     iconUrl = "blackCrab.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Membranipora_membranacea" = makeIcon(
-  #     iconUrl = "algae.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Oncorhynchus_mykiss" = makeIcon(
-  #     iconUrl = "trout.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Ostrea_edulis" = makeIcon(
-  #     iconUrl = "mussel.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15),
-  #   "Styela_clava" = makeIcon(
-  #     iconUrl = "blackCrab.png",
-  #     iconWidth = 30,
-  #     iconHeight = 15)
-  # )
-  # 
-  # if(!all(publicdata$Species %in% names(publicIcons))){
-  #   warning(paste0("basemap() in functions.R does not have a logo associated with: ",
-  #                  unique(publicdata$Species[!publicdata$Species %in% names(publicIcons)]),
-  #                  collapse="\n"))
-  # }
   
   leaflet(leases,...) %>%
     addTiles() %>%
@@ -278,9 +143,6 @@ basemap_pReport<- function(leases, publicdata, publicdatasp,...){
                      fillColor = 'black',
                      color = 'darkgrey',
                      fillOpacity = 0.7)%>%
-  # addMarkers(data=publicdata$geometry,
-  #            icon = publicIcons[as.numeric(factor(publicdata$Species,levels=sort(publicdatasp)))],
-  #            group = publicdata$Species) %>%
   addLayersControl(overlayGroups = c("Leases",publicdata$Species),
                    options = layersControlOptions(collapsed = FALSE))
 }
