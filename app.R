@@ -6,6 +6,7 @@ if(!require("leaflet")) install.packages("leaflet")
 if(!require("leaflet.minicharts")) install.packages("leaflet.minicharts")
 if(!require("data.table")) install.packages("data.table")
 if(!require("markdown")) install.packages("markdown")
+if(!require("rsconnect")) install.packages("rsconnect")
 if(!require("tidyverse")) install.packages("tidyverse")
 
 #### global variables ####
@@ -102,14 +103,6 @@ pei_incidental_dist <- readRDS("outputdata/pei_incidental_dist.rds")
 pei_monitoring_dist <- readRDS("outputdata/pei_monitoring_dist.rds")
 pei_metabarcoding_dist<-readRDS("outputdata/pei_metabarcoding_dist.rds")
 
-
-# greenCrabIcon <- makeIcon(
-#   iconUrl = "GreenCrab.png",
-#   iconWidth = 50,
-#   iconHeight = 37
-# )
-
-# html_legend <- paste0("<img src='",getwd(),"/",greenCrabIcon$iconUrl,"'>  Green Crab")
 
 source("functions.R")
 

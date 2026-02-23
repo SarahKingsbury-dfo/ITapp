@@ -10,4 +10,4 @@ url: https://mar-dfo-ais-sarahk.shinyapps.io/ITapp/
 version: 1
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: algae.png|blackcrab.png|crayfish.png|goldfish.png|GreenCrab.png|mussel.png|pike.png|prepare_data.R|skeletonshrimp.png|snail.png|trout.png|tunicate.png|recentdata
+ignoredFiles: prepare_data.R|recentdata
