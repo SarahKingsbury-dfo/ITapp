@@ -19,15 +19,24 @@ proj <- "+proj=longlat +datum=WGS84"
 equidist <- "+proj=eqdc +lon_0=-63.59 +lat_1=43.92 +lat_2=48.33 +lat_0=46.13 +x_0=1000000 +y_0=1000000 +datum=WGS84 +units=m +no_defs"
 sf_use_s2(FALSE)
 
+# NS<-st_read("spatialdata/NS_Aqua_lease_2026/geo_export_95bfaf74-c1b7-4c65-a258-d1cb7076637e.shp")%>%
+#   mutate(Lease_Identifier=license_le)
+#saveRDS(NS, "spatialdata/NS.rds")
+
+# NB_shell<-st_read("spatialdata/NB_lease/Shellfish.geojson")%>%
+#   mutate(Lease_Identifier=SITE_NUMBER)%>%
+#   select(-"CULTIVATION_METHOD")
+# NB_finfish<-st_read("spatialdata/NB_lease/Finfish.geojson")%>%
+#   mutate(Lease_Identifier=SITE_NUMBER)
+# NB<-rbind(NB_shell, NB_finfish)
+# saveRDS(NB, "spatialdata/NB.rds")
 
 
 NS <- readRDS("spatialdata/NS.rds")
-NB <- readRDS("spatialdata/NB.rds")
+NB<- readRDS("spatialdata/NB.rds")
 PEI <- readRDS("spatialdata/PEI.rds")
 
 species <- read.csv("commonnames.csv")
-
-
 
 # Load and clean up incidental data ---------------------------------------
 
@@ -54,20 +63,23 @@ incidental_occ <- occ(query=species$Scientific_Name,
   ))
 
 incidental_occ<-incidental_occ%>%
+  filter(!grepl("BOLD", name))%>% #remove any columns form the BOLD database
   mutate(Species=case_when(name %in% c("Aequipecten irradians (Lamarck, 1819)","Argopecten irradians (Lamarck, 1819)", "Argopecten irradians", "Argopecten irradians irradians", "Aequipecten irradians sablensis A.H.Clarke, 1965" ,"Argopecten irradians sablensis (A.H.Clarke, 1965)") ~ "Argopecten_irradians",
                            name %in% c("Ascidiella aspersa (Müller, 1776)", "Ascidiella aspersa (M?ller, 1776)","Ascidiella aspersa" ) ~ "Ascidiella_aspersa",
                            name %in% c("BOLD:AAA7687","BOLD:ACL8382","Carcinus maenas (Linnaeus, 1758)", "Carcinus maenas") ~ "Carcinus_maenas",
                            name %in% c("Botrylloides violaceus Oka, 1927", "Botrylloides violaceus") ~ "Botrylloides_violaceus",
                            name %in% c("Botryllus schlosseri (Pallas, 1766)", "Botryllus schlosseri") ~ "Botryllus_schlosseri",
                            name %in% c("Caprella mutica Schurin, 1935","BOLD:AAE7686", "Caprella mutica") ~ "Caprella_mutica",
-                           name %in% c("Carcinus maenas (Linnaeus, 1758)")~"Carcinus maenas",
+                           name %in% c("Carcinus maenas (Linnaeus, 1758)", "Carcinus maenas")~"Carcinus maenas",
                            name %in% c("Ciona intestinalis (Linnaeus, 1767)","Ciona intestinalis tenella (Stimpson, 1852)","Ciona tenella (Stimpson, 1852)", "Ciona intestinalis" ) ~ "Ciona_intestinalis",
-                           name %in% c("Codium fragile (Suringar) Hariot","Codium fragile subsp. fragile","Codium fragile subsp. tomentosoides (Goor) P.C.Silva","Codium fragile tomentosoides", "Codium fragile", "Codium fragile (Suringar) Har." ) ~ "Codium_fragile",
+                           name %in% c("Codium fragile (Suringar) Hariot","Codium fragile subsp. fragile","Codium fragile subsp. tomentosoides (Goor) P.C.Silva","Codium fragile tomentosoides", "Codium fragile", "Codium fragile (Suringar) Har." ,"Codium fragile var. fragile") ~ "Codium_fragile",
+                           name %in% c("Diadumene lineata (Verrill, 1869)", "Diadumene lineata")~"Diadumene_lineata",
                            name %in% c("Didemnum vexillum Kott, 2002", "Didemnum vexillum") ~ "Didemnum_vexillum",
                            name %in% c("Diplosoma listerianum (Milne Edwards, 1841)", "Diplosoma listerianum") ~ "Diplosoma_listerianum",
+                           name %in% c("Fucus serratus L.", "Fucus serratus")~"Fucus_serratus",
                            name %in% c("Hemigrapsus sanguineus (De Haan, 1835)","Hemigrapsus sanguineus (de Haan, 1835)", "Hemigrapsus sanguineus") ~ "Hemigrapsus_sanguineus",
                            name %in% c("Juxtacribrilina mutabilis (Ito, Onishi & Dick, 2015)","Juxtacribrilina mutabilis")~"Juxtacribrilina_mutabilis",
-                           name %in% c("Membranipora membranacea (Linnaeus, 1767)", "Flustra membranacea Linnaeus, 1767", "Membranipora membranacea" ) ~ "Membranipora_membranacea",
+                           name %in% c("Membranipora membranacea (Linnaeus, 1767)", "Flustra membranacea Linnaeus, 1767", "Membranipora membranacea") ~ "Membranipora_membranacea",
                            name %in% c("Oncorhynchus mykiss (Walbaum, 1792)", "Oncorhynchus mykiss") ~ "Oncorhynchus_mykiss",
                            name %in% c("Ostrea edulis (Linnaeus, 1767)","Ostrea edulis Linnaeus, 1758","Ostrea edulis") ~ "Ostrea_edulis",
                            name %in% c("Sargassum muticum (Yendo) Fensholt", "Sargassum muticum")~"Sargassum_muticum",
@@ -184,12 +196,36 @@ gulf_tunicate_incidental_2024<-readxl::read_excel("recentdata/Gulf 2024 AIS Data
   mutate(prov="Gulf Science Data contact Renee.Bernier@dfo-mpo.gc.ca") %>% 
   st_cast('POINT')
 
+gulf_tunicate_incidental_2025<-readxl::read_excel("recentdata/Gulf 2025 AIS Data_Science Gulf_Feb2026.xlsx",sheet=2,col_types =  "text") %>% 
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
+  dplyr::rename(StnLocation=`Location Name`,
+                "Botryllus_schlosseri"="B schlosseri",
+                "Botrylloides_violaceus"="B violaceus",
+                "Ciona_intestinalis"="C intestinalis",
+                "Styela_clava"="S clava",
+                "Membranipora_membranacea"="M membranacea",
+                "Carcinus_maenas"="C maenas",
+                "Codium_fragile"="C fragile",
+                "Juxtacribrilina_mutabilis"="J mutabilis",
+                "Fucus_serratus"="F serratus",
+                "Caprella_mutica"="C mutica") %>% 
+  dplyr::select(-Province,-Comments) %>% 
+  gather(key = "Species", value = "Presence",-StnLocation,-Year,-geometry) %>% 
+  group_by(Species,StnLocation,Year) %>% 
+  summarize(Presence = if_else(all(is.na(Presence)),
+                               FALSE,
+                               any(Presence>0,na.rm = TRUE))) %>% 
+  ungroup() %>% 
+  filter(Presence) %>% 
+  mutate(prov="Gulf Science Data contact Renee.Bernier@dfo-mpo.gc.ca") %>% 
+  st_cast('POINT')
+
 mar_incidental <- read.csv("recentdata/Incidental_AIS_Reports_MAR.csv")%>%
+  filter(!Lat == 'NA')%>%
   sf::st_as_sf(coords=c('Lon','Lat'),crs=4326) %>% 
   filter(Picture_Confirmation==1) %>% 
   mutate(Presence=as.logical(Picture_Confirmation),
-         prov = paste("Maritimes Incidental Data:", "Contact Sarah.Kingsbury@dfo-mpo.gc.ca"),
-         Year = 2021,
+         prov = paste("Maritimes Incidental Data:", "Contact Sarah.Kingsbury@dfo-mpo.gc.ca")
          ) %>% 
   dplyr::select(Species,StnLocation,Year,prov)%>%
   filter(Species %in% species$R_Name) #only keep species of relevance to I&T transfers
@@ -206,6 +242,8 @@ incidental_sites <- rbind(
   gulf_tunicate_incidental_2023%>% 
     dplyr::select(StnLocation),
   gulf_tunicate_incidental_2024%>% 
+    dplyr::select(StnLocation),
+  gulf_tunicate_incidental_2025%>% 
     dplyr::select(StnLocation),
   mar_incidental%>%
     dplyr::select(StnLocation)
@@ -238,6 +276,9 @@ incidental <-  dplyr::bind_rows(
     dplyr::mutate(across(.fns = as.character))%>%
     as.data.table(),
   gulf_tunicate_incidental_2024 %>%
+    dplyr::mutate(across(.fns = as.character))%>%
+    as.data.table(),
+  gulf_tunicate_incidental_2025 %>%
     dplyr::mutate(across(.fns = as.character))%>%
     as.data.table(),
   mar_incidental%>%
@@ -376,9 +417,11 @@ metabarcoding<-bind_rows(
            Carcinus_maenas=0,
            across(everything(), as.character))%>%
     as.data.frame(),
+    eDNA_2023%>%
     mutate(Carcinus_maenas=0,
            across(everything(), as.character))%>%
     as.data.frame(),
+  eDNA_2024%>%
     mutate(Membranipora_membranacea=0,
            Hemigrapsus_sanguineus=0,
            Didemnum_vexillum=0,
@@ -431,6 +474,7 @@ maritimes_tunicate_monitor_1 <- rbind(
   )%>%
   dplyr::rename(geometry=geoms,Year = year, StnLocation=stn_location)%>% 
   st_transform(proj) %>% 
+  filter(cover_index=="1")%>%
   dplyr::select(-OBJECTID,-latitude,-longitude,-cover_index,-province,-stn_num)
 
 maritimes_tunicate_monitor_2 <- rbind(
@@ -453,21 +497,29 @@ maritimes_tunicate_monitor_2 <- rbind(
 )%>%
   dplyr::rename(geometry=geoms,Year = year, StnLocation=stn_location)%>% 
   st_transform(proj) %>% 
-  dplyr::select(-OBJECTID,-latitude,-longitude,-cover_index,-province,-stn_num)
+  filter(cover_index=="1")%>%
+  dplyr::select(-OBJECTID,-latitude,-longitude,-province,-stn_num, -cover_index)
 
 #the 2024 data is not yet availabel online and must be entered manually
                                 
 maritimes_tunicate_2024 <- read.csv("recentdata/Final_AIS_tunicate_2006_2024_present_absent_long.csv")%>%
-  filter(year=="2024")%>%
+  filter(year=="2024" & cover_index=="1")%>%
   st_as_sf(coords=c('longitude','latitude'),crs=4326)%>%
   dplyr::rename(species_name=species.name,Year = year, StnLocation=stn.location)%>%
   st_transform(proj)%>%
   dplyr::select(-cover_index,-province,-stn_num) 
 
+maritimes_tunicate_2025 <- read.csv("recentdata/Final_AIS_tunicate_2006_2025_present_absent_long_Feb_4th_2026.csv")%>%
+  filter(year=="2025" & cover_index=="1")%>%
+  st_as_sf(coords=c('longitude','latitude'),crs=4326)%>%
+  dplyr::rename(species_name=species.name,Year = year, StnLocation=stn.location)%>%
+  st_transform(proj)%>%
+  dplyr::select(-cover_index,-province,-stn_num) 
 
 maritimes_tunicate_monitor<-rbind(maritimes_tunicate_monitor_1,
                                   maritimes_tunicate_monitor_2,
-                                  maritimes_tunicate_2024)%>%
+                                  maritimes_tunicate_2024,
+                                  maritimes_tunicate_2025)%>%
   mutate(Species=gsub(" ","_",species_name))%>%
   dplyr::select(-species_name)%>%
   mutate(Presence=as.character(1))%>%
@@ -497,7 +549,8 @@ gulf_tunicate_monitor_2020 <- readxl::read_excel("recentdata/Gulf AIS data_biof_
                 "Codium_fragile"="C fragile")%>%
   dplyr::select(-Province)%>%
   #mutate(Year=as.character(Year))%>%
-  as.data.frame()
+  #as.data.frame()%>%
+  st_transform(proj)
   # mutate(Juxtacribrilina_mutabilis=as.character("0"),
   #        Year=as.character(Year))%>%
   # st_transform(proj)
@@ -515,10 +568,10 @@ gulf_tunicate_monitor_2021 <- readxl::read_excel("recentdata/Copy of P-A Table_2
                 "Codium_fragile"="C fragile")%>%
   dplyr::select(-Province)%>%
   #mutate(Year=as.character(Year))%>%
-  as.data.frame()
+  #as.data.frame()
   # mutate(Juxtacribrilina_mutabilis=as.character("0"),
   #        Year=as.character(Year))%>%
-  # st_transform(proj)
+   st_transform(proj)
 
 gulf_tunicate_monitor_2022 <- readxl::read_excel("recentdata/Copy of 2022 P-A Data_AIS monitoring_Gulf Region_Jan2023.xlsx") %>% 
   st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
@@ -526,10 +579,10 @@ gulf_tunicate_monitor_2022 <- readxl::read_excel("recentdata/Copy of 2022 P-A Da
   mutate(Year=2022)%>%
   dplyr::select(-Date_In, -Date_Out, -Province) %>%
    #mutate(Year=as.character(Year))%>%
-  as.data.frame()
+  #as.data.frame()
   # mutate(Juxtacribrilina_mutabilis=as.character("0"),
   #        Year=as.character(Year))%>%
-  # st_transform(proj)
+   st_transform(proj)
 
 #missing data for 2023 from Gulf
 
@@ -548,15 +601,37 @@ gulf_tunicate_montior_2024<-readxl::read_excel("recentdata/Gulf 2024 AIS Data_Fe
                 "Juxtacribrilina_mutabilis"="J mutabilis"
                 )%>%
    dplyr::select(-Province, -Comments)%>%
-  as.data.frame()
+  #as.data.frame()
+  st_transform(proj)
   
+gulf_tunicate_montior_2025<-readxl::read_excel("recentdata/Gulf 2025 AIS Data_Science Gulf_Feb2026.xlsx", sheet=1, col_types = 'text') %>% 
+  filter(!Latitude=="NA")%>%
+  st_as_sf(coords=c('Longitude','Latitude'),crs=4326) %>% 
+  dplyr::rename(StnLocation="Station Name",
+                "Botryllus_schlosseri"="B. schlosseri",
+                "Botrylloides_violaceus"="B. violaceus",
+                "Ciona_intestinalis"="C. intestinalis",
+                "Styela_clava"="S. clava",
+                "Caprella_mutica"="C. mutica",
+                "Membranipora_membranacea"="M. membranacea", 
+                "Carcinus_maenas"="C. maenas",
+                "Codium_fragile"="C. fragile",
+                "Juxtacribrilina_mutabilis"="J. mutabilis",
+                "Fucus_serratus"="F. serratus",
+                "Diadumene_lineata"="D. lineata",
+  )%>%
+  dplyr::select(-Province, -Comments)%>%
+  #as.data.frame()
+  st_transform(proj)
 
 gulf_tunicate_monitor<-bind_rows(gulf_tunicate_monitor_2020,
                              gulf_tunicate_monitor_2021,
-                             gulf_tunicate_monitor_2022)
+                             gulf_tunicate_monitor_2022)%>%
+  st_transform(proj)
 
-gulf_tunicate_monitor<-rbind(gulf_tunicate_monitor%>%mutate(Juxtacribrilina_mutabilis=0),
-                             gulf_tunicate_montior_2024)%>%
+gulf_tunicate_monitor<-rbind(gulf_tunicate_monitor%>%mutate(Juxtacribrilina_mutabilis=0, Fucus_serratus=0, Diadumene_lineata=0),
+                             gulf_tunicate_montior_2024%>%mutate(Fucus_serratus=0, Diadumene_lineata=0),
+                             gulf_tunicate_montior_2025)%>%
   st_as_sf()%>%
   st_transform(proj)
 
@@ -569,7 +644,7 @@ monitoring_sites <- rbind(maritimes_tunicate_monitor%>%
                           ) %>% 
   group_by(StnLocation) %>% 
   summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
-  unique() %>% 
+  #unique() %>% 
   mutate(StnLocation=gsub("[ \t]+$","",StnLocation)) %>% 
   st_transform(equidist) %>% 
   filter(geometry%>% 
@@ -579,12 +654,15 @@ monitoring_sites <- rbind(maritimes_tunicate_monitor%>%
 
 monitoring <- rbind(maritimes_tunicate_monitor%>%
                       mutate(Carcinus_maenas=0,
-                             Codium_fragile=0)%>%
+                             Codium_fragile=0,
+                             Fucus_serratus=0,
+                             Diadumene_lineata=0)%>%
                           as.data.table(),
                         gulf_tunicate_monitor %>% 
                       mutate(Ascidiella_aspersa=0,
+                             Diplosoma_listerianum=0,
                              Didemnum_vexillum=0,
-                             Diplosoma_listerianum=0)%>%
+                             Tricellaria_inopinata=0)%>%
                           as.data.table()) %>% 
   dplyr::select(-geometry) %>% 
   unique()%>%
