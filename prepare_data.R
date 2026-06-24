@@ -3,6 +3,7 @@ if(!require("robis")) install.packages("robis")
 if(!require("devtools")) install.packages("devtools")
 if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
 if(!require("arcpullr")) devtools::install_github("pfrater/arcpullr")
+if(!require("arcgislayers")) install.packages("arcgislayers")
 if(!require("sf")) install.packages("sf")
 if(!require("raster")) install.packages("raster")
 if(!require("fasterize")) install.packages("fasterize")
@@ -16,12 +17,18 @@ print("Warning: Initial installation will take multiple hours!")
 
 print("Loading data")
 proj <- "+proj=longlat +datum=WGS84"
-equidist <- "+proj=eqdc +lon_0=-63.59 +lat_1=43.92 +lat_2=48.33 +lat_0=46.13 +x_0=1000000 +y_0=1000000 +datum=WGS84 +units=m +no_defs"
+equidist <- "+proj=eqdc +lon_0=-58.50 +lat_0=48.00 +lat_1=44.00 +lat_2=52.00 +x_0=1000000 +y_0=1000000 +datum=WGS84 +units=m +no_defs"
 sf_use_s2(FALSE)
 
 # NS<-st_read("spatialdata/NS_Aqua_lease_2026/geo_export_95bfaf74-c1b7-4c65-a258-d1cb7076637e.shp")%>%
 #   mutate(Lease_Identifier=license_le)
 #saveRDS(NS, "spatialdata/NS.rds")
+
+# NL<- st_read("spatialdata/NL_lease/Fisheries_and_Aquaculture_-_Licensed_Fish_Processors_and_Aquaculture_Sites.shp")%>%
+#   mutate(Lease_Indentifier=LICENSES)%>%
+#   st_transform(proj)
+# saveRDS(NL, "spatialdata/NL.rds")
+
 
 # NB_shell<-st_read("spatialdata/NB_lease/Shellfish.geojson")%>%
 #   mutate(Lease_Identifier=SITE_NUMBER)%>%
@@ -35,12 +42,13 @@ sf_use_s2(FALSE)
 NS <- readRDS("spatialdata/NS.rds")
 NB<- readRDS("spatialdata/NB.rds")
 PEI <- readRDS("spatialdata/PEI.rds")
+NL<- readRDS ("spatialdata/NL.rds")
 
 species <- read.csv("commonnames.csv")
 
 # Load and clean up incidental data ---------------------------------------
 
-searcharea <- c(NS$geometry,NB$geometry,PEI$geometry) %>% 
+searcharea <- c(NS$geometry,NB$geometry,PEI$geometry, NL$geometry) %>% 
   st_combine() %>% 
   st_convex_hull() %>% 
   st_sfc()%>%
@@ -97,8 +105,13 @@ asian_shore_crab_2020 <- rbind(arcpullr::get_spatial_layer("https://egisp.dfo-mp
                                arcpullr::get_spatial_layer("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/227") )%>%
   dplyr::rename(geometry=geoms, StnLocation=stn_location)%>% 
   st_transform(proj) %>% 
-  dplyr::select(-OBJECTID,-latitude,-longitude,-Region)%>%
-  dplyr::filter(Count>=1)
+  dplyr::filter(cover_index>=1)%>%
+  dplyr::select(-OBJECTID,-latitude,-longitude, -province, -stn_num, -cover_index)%>%
+  rename("Species"="species_name",
+         "Year"="year")%>%
+  mutate(Presence="TRUE",
+         prov="DFO Science Maritimes Region contact Claudio.DiBacco@dfo-mpo.gc.ca",
+         Species=str_replace_all(Species, " ", "_"))
   
 gulf_tunicate_incidental_2020 <- readxl::read_excel("recentdata/Gulf AIS data_biof_monit_incidental_AISNCP MAR_April 2021.xlsx",sheet=2,col_types =  "text") %>%
   mutate('Longitude (W)'=case_when(`Latitude (N)`=="*waiting for coordinate"~-61.91,   #fixing bad data entry
@@ -230,11 +243,20 @@ mar_incidental <- read.csv("recentdata/Incidental_AIS_Reports_MAR.csv")%>%
   dplyr::select(Species,StnLocation,Year,prov)%>%
   filter(Species %in% species$R_Name) #only keep species of relevance to I&T transfers
 
+NS_RAS_2025<-readxl::read_xlsx ("recentdata/NSRAS2025_nonindigenousspecies_summary_EditedJune2026.xlsx", sheet=2)%>%
+  rename("StnLocation"="Station name")%>%
+  sf::st_as_sf(coords=c("DecimalLONG","DecimalLAT"),crs=4326)%>%
+  mutate(Year=2025,
+         Presence="TRUE",
+         prov="Huntsman Marine Science Centre")%>%
+  select(-Group, -Date, -`Identified by`, -`Notes on confirmation of prescence`, -`Station code`)%>%
+  mutate(Species=str_replace_all(Species, " ", "_"))
+
 incidental_sites <- rbind(
   # incidental_occ %>%
   #   dplyr::select(StnLocation),
-  asian_shore_crab_2020 %>% 
-    dplyr::select(StnLocation),
+  # asian_shore_crab_2020 %>% 
+  #   dplyr::select(StnLocation),
   gulf_tunicate_incidental_2020 %>% 
     dplyr::select(StnLocation),
   gulf_tunicate_incidental_2021%>% 
@@ -246,6 +268,8 @@ incidental_sites <- rbind(
   gulf_tunicate_incidental_2025%>% 
     dplyr::select(StnLocation),
   mar_incidental%>%
+    dplyr::select(StnLocation),
+  NS_RAS_2025%>%
     dplyr::select(StnLocation)
 )%>%
   na.omit()%>%
@@ -263,9 +287,9 @@ incidental <-  dplyr::bind_rows(
   # incidental_occ %>%
   #   mutate(across(.fns = as.character))%>%
   #   as.data.table(),
-  asian_shore_crab_2020 %>%
-    dplyr::mutate(across(.fns = as.character))%>%
-    as.data.table(),
+  # asian_shore_crab_2020 %>%
+  #   dplyr::mutate(across(.fns = as.character))%>%
+  #   as.data.table(),
   gulf_tunicate_incidental_2020 %>%
     dplyr::mutate(across(.fns = as.character))%>%
     as.data.table(),
@@ -282,6 +306,9 @@ incidental <-  dplyr::bind_rows(
     dplyr::mutate(across(.fns = as.character))%>%
     as.data.table(),
   mar_incidental%>%
+    dplyr::mutate(across(.fns=as.character))%>%
+    as.data.table(),
+  NS_RAS_2025%>%
     dplyr::mutate(across(.fns=as.character))%>%
     as.data.table()
 ) %>% 
@@ -320,77 +347,37 @@ saveRDS(publicdata_sites,"outputdata/publicdata_sites.rds")
 saveRDS(publicdata,"outputdata/publicdata.rds")
 
 #Genomics Data
-metabarcode_2022<-read.csv("recentdata/metbarcoding_MAR_2022.csv")%>%
-  st_as_sf(coords=c("longitude","latitude"),crs=4326)%>%
-  st_transform(proj)%>%
-  dplyr::select(-sample_name, -LAB)%>%
-  as.data.frame()
 
-metabarcode_2023<-readxl::read_excel("recentdata/MAR-Metabarcoding-ESV_2023.xlsx",sheet=1,col_types =  "text") %>% 
-  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
-  st_transform(proj)%>% 
-dplyr::rename(StnLocation=Location,
-              "Botrylloides_violaceus"="Botrylloides violaceus",
-              "Caprella_mutica"="Caprella mutica",
-              "Ascidiella_aspersa" ="Ascidiella aspersa",
-              "Ciona_intestinalis"="Ciona intestinalis",
-              "Membranipora_membranacea"="Membranipora membranacea")%>%
-  mutate(Year=as.factor("2023"))%>%
-  dplyr::select("Year","StnLocation", "Botrylloides_violaceus", "Caprella_mutica", "Ascidiella_aspersa", "Ciona_intestinalis", "Membranipora_membranacea", "geometry")%>%
-  as.data.frame()
+#Attempting layer pull into R from Claudio's eDNA result list
+library(arcgislayers)
 
-eDNA_2023<- readxl::read_excel("recentdata/MAR-Metabarcoding-qPCR_2023.xlsx",sheet=1,col_types =  "text") %>% 
-  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
-  st_transform(proj)%>%
-  mutate(Botrylloides_violaceus=as.character(case_when(`Botrylloides violaceus...15`=="Detected"~1,
-                                                    `Botrylloides violaceus...31`=="Detected"~1)),
-         Caprella_mutica=as.character(case_when(`Caprella mutica`=="Detected"~1)),
-         Ascidiella_aspersa=as.character(case_when(`Ascidiella aspersa...13`=="Detected"~1,
-                                                    `Ascidiella aspersa...27`=="Detected"~1)),
-         Ciona_intestinalis=as.character(case_when(`Ciona intestinalis...17`=="Detected"~1)),
-         Membranipora_membranacea=as.character(case_when(`Membranipora membranacea...28`=="Detected"~1,
-                                                `Membranipora membranacea...19`=="Detected"~1)),
-         Botryllus_schlosseri=as.character(case_when(`Botryllus schlosseri`=="Detected"~1)),
-         Styela_Clava=as.character(case_when(`Styela Clava`=="Detected"~1)),
-         Hemigrapsus_sanguineus=as.character(case_when(`Hemigrapsus sanguineus`=="Detected"~1)),
-         Didemnum_vexillum=as.character(case_when(`Didemnum vexillum`=="Detected"~1)),
-         Diplosoma_listerianum=as.character(case_when(`Diplosoma listerianum`=="Detected"~1))
-         )%>%
-  dplyr::rename(StnLocation=Site)%>%
-  mutate(Year=as.factor("2023"))%>%
-  dplyr::select("Year", "StnLocation", "Botrylloides_violaceus", "Caprella_mutica", "Ascidiella_aspersa", "Ciona_intestinalis", "Membranipora_membranacea","Botryllus_schlosseri", "Styela_Clava","Hemigrapsus_sanguineus", "Didemnum_vexillum", "Diplosoma_listerianum", "geometry")%>%
-  as.data.frame()
+base_url <- "https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/"
 
-eDNA_2023[is.na(eDNA_2023)]<-0
+# Explicitly target the data-holding year layers underneath ID 362
+leaf_ids <- c(363, 364, 365, 367, 368, 369, 371, 372, 373, 375, 376, 377, 379, 380, 381, 383, 384, 385, 387, 388, 389, 391, 392, 393, 395, 396, 397, 399, 400, 401) 
 
-#we only have the qPCR eDNA results from 2024 thus far. 
-eDNA_2024<-readxl::read_excel("recentdata/RESULTS-Preliminary_Harbour Monitoring Project_targeted qPCR.xlsx")%>% 
-  filter(!Latitude == "NA")%>%
-  st_as_sf(coords=c('Longitude','Latitude'),crs=4326)%>%
-  st_transform(proj)%>%
-  mutate(Botrylloides_violaceus=as.character(case_when(`B.  violaceus Site result`=="Detected"~1)),
-         Caprella_mutica=as.character(case_when(`C. mutica Site result`=="Detected"~1)),
-         Ascidiella_aspersa=as.character(case_when(`A. aspersa Site result`=="Detected"~1)),
-         Ciona_intestinalis=as.character(case_when(`C. intestinalis Site result`=="Detected"~1)),
-         Botryllus_schlosseri=as.character(case_when(`B. schlosseri Site result`=="Detected"~1)),
-         Styela_Clava=as.character(case_when(`S. clava Site result`=="Detected"~1)),
-         Diplosoma_listerianum=as.character(case_when(`D. listerianum Site result`=="Detected"~1))
-  )%>%
-  dplyr::rename(StnLocation=Location)%>%
-  mutate(Year=as.factor("2024"))%>%
-  dplyr::select("Year", "StnLocation", "Botrylloides_violaceus", "Caprella_mutica", "Ascidiella_aspersa", "Ciona_intestinalis", "Botryllus_schlosseri", "Styela_Clava","Diplosoma_listerianum", "geometry")%>%
-  as.data.frame()
-
-eDNA_2024[is.na(eDNA_2024)]<-0 
+# Construct URLs, open connections, and pull spatial tables directly
+edna_sf <- lapply(leaf_ids, function(id) {
+  layer_url <- paste0(base_url, id)
+  message("Connecting directly to target layer ID: ", id)
   
-metabarcoding_sites<-rbind(metabarcode_2022%>% 
-                             dplyr::select(StnLocation, geometry),
-                           metabarcode_2023%>% 
-                             dplyr::select(StnLocation, geometry),
-                           eDNA_2023%>% 
-                             dplyr::select(StnLocation, geometry),
-                           eDNA_2024%>% 
-                             dplyr::select(StnLocation, geometry))%>%
+  opened_layer <- arc_open(layer_url)
+  arc_select(opened_layer)
+})
+
+eDNA_df<-rbindlist(edna_sf, fill=TRUE)%>%
+  filter(cover_index>0)%>%
+  rename("StnLocation"= "stn_location",
+         "Year"="year",
+         "Species"="species_name")%>%
+  select(-OBJECTID, -province, -stn_num, -latitude, -longitude, -cover_index)%>%
+  mutate(Species=str_replace_all(Species, " ", "_"),
+         Presence=TRUE)%>%
+  st_as_sf()
+  
+
+eDNA_sites<-eDNA_df%>% 
+                             dplyr::select(StnLocation, geometry)%>%
   na.omit()%>%
   st_as_sf()%>%
   dplyr::group_by(StnLocation) %>% 
@@ -403,47 +390,30 @@ metabarcoding_sites<-rbind(metabarcode_2022%>%
   st_transform(proj)
 
 
-metabarcoding<-bind_rows(
-  metabarcode_2022%>%
-    mutate(Hemigrapsus_sanguineus=0,
-           across(everything(), as.character))%>%
-    as.data.frame(),
-  metabarcode_2023%>%
-    mutate(Botryllus_schlosseri=0,
-           Styela_Clava=0,
-           Hemigrapsus_sanguineus=0,
-           Didemnum_vexillum=0,
-           Diplosoma_listerianum=0,
-           Carcinus_maenas=0,
-           across(everything(), as.character))%>%
-    as.data.frame(),
-    eDNA_2023%>%
-    mutate(Carcinus_maenas=0,
-           across(everything(), as.character))%>%
-    as.data.frame(),
-  eDNA_2024%>%
-    mutate(Membranipora_membranacea=0,
-           Hemigrapsus_sanguineus=0,
-           Didemnum_vexillum=0,
-           Carcinus_maenas=0,
-           across(everything(), as.character))%>%
-    as.data.frame()
-)%>%
+eDNA<-eDNA_df%>%
+    as.data.frame()%>%
   dplyr::select(-geometry) %>% 
   unique()%>%
   gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
   group_by(Species,StnLocation,Year) %>% 
-  summarize(Presence = if_else(all(is.na(Presence)),
-                               FALSE,
-                               any(Presence>0,na.rm = TRUE))) %>%
-  ungroup() %>%
   spread(key = "Species", value = "Presence") %>%
-  right_join(metabarcoding_sites,by = "StnLocation") %>%
+  right_join(eDNA_sites, by = "StnLocation") %>%
   st_sf() %>% 
   mutate(StnLocation=gsub("[ \t]+$","",StnLocation))
 
-saveRDS(metabarcoding_sites, "outputdata/metabarcoding_sites.rds")
-saveRDS(metabarcoding, "outputdata/metabarcoding.rds")
+eDNA <- eDNA_df %>%
+  as.data.frame() %>%
+  dplyr::select(-geometry) %>% 
+  unique() %>%
+  # If your starting data has a single column called 'Species' and a column called 'Presence'
+  # Pivot it wide so every species gets its own column
+  pivot_wider(names_from = Species, values_from = Presence, values_fill = FALSE) %>%
+  mutate(StnLocation = gsub("[ \t]+$", "", StnLocation)) %>%
+  right_join(eDNA_sites, by = "StnLocation") %>%
+  st_sf()
+
+saveRDS(eDNA_sites, "outputdata/eDNA_sites.rds")
+saveRDS(eDNA, "outputdata/eDNA.rds")
 
 # Load and clean up monitoring data ---------------------------------------
 
@@ -451,23 +421,23 @@ saveRDS(metabarcoding, "outputdata/metabarcoding.rds")
 #Biofouling data for MAR is available here: https://open.canada.ca/data/en/dataset/8d87f574-0661-40a0-822f-e9eabc35780d
 #Please note that due to the file size, some of the data will be accessed in the first pull and the rest accessed in teh second pull. Data includes 2006-2023
 maritimes_tunicate_monitor_1 <- rbind(
-  (lapply(2:13,function(x)
+  (lapply(4:17,function(x)
      {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for A. aspersa
      })%>%
      bind_rows()),
-  (lapply(29:46,function(x)
+  (lapply(19:38,function(x)
   {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for B. violaceus
   })%>%
     bind_rows()),
-  (lapply(68:85,function(x)
+  (lapply(40:59,function(x)
   {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for B. schlosseri
   })%>%
     bind_rows()),
-  (lapply(107:118,function(x)
+  (lapply(61:74,function(x)
   {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for C. mutica
   })%>%
     bind_rows()),
-  (lapply(257:268,function(x)
+  (lapply(76:95,function(x)
   {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for S. clava
   })%>%
     bind_rows())
@@ -478,19 +448,23 @@ maritimes_tunicate_monitor_1 <- rbind(
   dplyr::select(-OBJECTID,-latitude,-longitude,-cover_index,-province,-stn_num)
 
 maritimes_tunicate_monitor_2 <- rbind(
-  (lapply(134:151,function(x)
+  (lapply(97:110,function(x)
   {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for C. intestinalis
   })%>%
     bind_rows()),
-  (lapply(173:184,function(x)
+  (lapply(112:125,function(x)
   {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for D. vexillum
   })%>%
     bind_rows()),
-  (lapply(200:211,function(x)
+  (lapply(127:128,function(x)
   {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for D. listerianum
   })%>%
     bind_rows()),
-  (lapply(230:241,function(x)
+  (lapply(130:143,function(x)
+  {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for M. membranacea
+  })%>%
+    bind_rows()),
+  (lapply(145:163,function(x)
   {arcpullr::get_spatial_layer(paste0("https://egisp.dfo-mpo.gc.ca/arcgis/rest/services/open_data_donnees_ouvertes/dfo_maritimes_biofouling_monitoring_program_en/MapServer/",x))#download all years of data at once for M. membranacea
   })%>%
     bind_rows())
@@ -500,36 +474,30 @@ maritimes_tunicate_monitor_2 <- rbind(
   filter(cover_index=="1")%>%
   dplyr::select(-OBJECTID,-latitude,-longitude,-province,-stn_num, -cover_index)
 
-#the 2024 data is not yet availabel online and must be entered manually
-                                
-maritimes_tunicate_2024 <- read.csv("recentdata/Final_AIS_tunicate_2006_2024_present_absent_long.csv")%>%
-  filter(year=="2024" & cover_index=="1")%>%
-  st_as_sf(coords=c('longitude','latitude'),crs=4326)%>%
-  dplyr::rename(species_name=species.name,Year = year, StnLocation=stn.location)%>%
-  st_transform(proj)%>%
-  dplyr::select(-cover_index,-province,-stn_num) 
-
-maritimes_tunicate_2025 <- read.csv("recentdata/Final_AIS_tunicate_2006_2025_present_absent_long_Feb_4th_2026.csv")%>%
-  filter(year=="2025" & cover_index=="1")%>%
-  st_as_sf(coords=c('longitude','latitude'),crs=4326)%>%
-  dplyr::rename(species_name=species.name,Year = year, StnLocation=stn.location)%>%
-  st_transform(proj)%>%
-  dplyr::select(-cover_index,-province,-stn_num) 
-
-maritimes_tunicate_monitor<-rbind(maritimes_tunicate_monitor_1,
-                                  maritimes_tunicate_monitor_2,
-                                  maritimes_tunicate_2024,
-                                  maritimes_tunicate_2025)%>%
-  mutate(Species=gsub(" ","_",species_name))%>%
-  dplyr::select(-species_name)%>%
-  mutate(Presence=as.character(1))%>%
-  as.data.frame()%>%
-  #dplyr::select(-geometry)%>% 
-  pivot_wider(id_cols = c(StnLocation,Year, geometry) ,names_from = Species, values_from = Presence)%>%
-  st_as_sf()%>%
-  st_transform(proj)
+maritimes_tunicate_monitor <- rbind(maritimes_tunicate_monitor_1,
+                                    maritimes_tunicate_monitor_2) %>%
+  mutate(Species = gsub(" ", "_", species_name)) %>%
+  dplyr::select(-species_name) %>%
+  mutate(Presence = "1") %>% # Simpler way to set character "1"
+  # 1. CRITICAL STEP: Remove duplicates before pivoting
+  # This stops c("1", "1") from forming by flattening duplicates
+  distinct(StnLocation, Year, Species, geometry, .keep_all = TRUE) %>%
   
-maritimes_tunicate_monitor[is.na(maritimes_tunicate_monitor)]<-"0"
+  as.data.frame() %>%
+  
+  # 2. Pivot data wide
+  pivot_wider(
+    id_cols = c(StnLocation, Year, geometry),
+    names_from = Species, 
+    values_from = Presence,
+    # Safety feature: If a duplicate still exists, just fill with "1" instead of c("1", "1")
+    values_fn = list(Presence = function(x) "1"), 
+    # Optional: Fill stations where the species was NOT found with "0" instead of NA
+    values_fill = "0" 
+  ) %>%
+  
+  st_as_sf() %>%
+  st_transform(proj)
 
 # Gulf Tunicates
 # gulf_tunicate_monitor <- esri2sf::esri2sf("https://gisp.dfo-mpo.gc.ca/arcgis/rest/services/FGP/DFO_Gulf_Region_Aquatic_Invasive_Species_Data/MapServer/0")
@@ -635,50 +603,174 @@ gulf_tunicate_monitor<-rbind(gulf_tunicate_monitor%>%mutate(Juxtacribrilina_muta
   st_as_sf()%>%
   st_transform(proj)
 
+NL_csv<-c("recentdata/NL AIS Open Data Golden star Tunicate 2006 to 2025.csv",
+          "recentdata/NL AIS Open Data Vase Tunicate 2006 to 2025.csv",
+          "recentdata/NL AIS Open Data Violet Tunicate 2006 to 2025.csv")
+
+# 2. Read all files into a named list (retaining file names for tracking)
+NL_tunicates_list <- map(set_names(NL_csv), \(file) {
+  read_csv(file, col_types = cols(.default = "c")) # Force columns to text to prevent merge crashes
+})
+
+# 3. Combine the list into one master dataframe
+tunicates_df <- list_rbind(NL_tunicates_list, names_to = "source_file") %>%
+  # Fix column classes that shouldn't be characters
+  mutate(
+    decimalLongitude = as.numeric(decimalLongitude),
+    decimalLatitude = as.numeric(decimalLatitude),
+    coordinateUncertaintyInMeters = as.integer(coordinateUncertaintyInMeters)
+  )
+
+# 4. (Optional) Convert the combined dataframe into a spatial 'sf' object
+tunicates_sf <- tunicates_df %>%
+  filter(!is.na(decimalLongitude) & !is.na(decimalLatitude)) %>% # Drop missing coordinates
+  st_as_sf(coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)%>%
+  filter(validated == "yes")%>%
+  mutate(Species=case_when(vernacularNameEN == "golden star tunicate" ~"Botryllus_schlosseri",
+                           vernacularNameEN =="vase tunicate"~"Ciona_intestinalis",
+                           vernacularNameEN =="violet tunicate"~"Botrylloides_violaceus"),
+         Presence=case_when(occurrenceStatus=="detected"~1,
+                            occurrenceStatus=="not detected"~0),
+         Year = as.integer(str_extract(eventDate2, "^\\d{4}")))%>%
+  rename("StnLocation"="locality")%>%
+  select (Year, Species, geometry, Presence, StnLocation)%>%
+  filter(!is.na(Species)) %>% # Drop any unmapped species to prevent an 'NA' column
   
+  # 4. Pivot from Long to Wide format
+  pivot_wider(
+    id_cols = c(StnLocation, Year, geometry),
+    names_from = Species,
+    values_from = Presence,
+    values_fn = max,        # Prevents c(1,1) by taking the maximum presence value
+    values_fill = 0         # Fills missing species records at a station with 0
+  )
+
+# 1. Extract the coordinates and reverse their matrix columns
+flipped_coords <- st_coordinates(tunicates_sf)[, c("Y", "X")]
+
+# 2. Convert the reversed coordinates back into clean POINT geometries
+corrected_geometry <- st_sfc(
+  lapply(1:nrow(flipped_coords), function(i) st_point(flipped_coords[i, ])),
+  crs = 4326
+)
+
+# 3. Replace the broken inverted geometry column with the corrected one
+st_geometry(tunicates_sf) <- corrected_geometry
+
+# 1. Identify which column names exist in maritimes but are missing in tunicates
+missing_cols <- setdiff(names(maritimes_tunicate_monitor), names(tunicates_sf))
+
+# 2. Dynamically create the missing columns filled with 0
+tunicates_sf <- tunicates_sf %>%
+  # Creates a list of 0s for each missing column name and adds them all at once
+  add_column(!!!set_names(rep(0, length(missing_cols)), missing_cols)) %>%
+  # Optional: Reorder columns to exactly match the maritimes dataset layout
+  select(all_of(names(maritimes_tunicate_monitor))) %>%
+  st_transform(proj)
+
+tunicates_sf <- tunicates_sf %>% 
+  st_set_crs(4326)%>%
+  st_transform(proj)
+
+# Define a brand new, wide bounding box for Atlantic Canada (WGS84 degrees)
+atlantic_bbox <- st_bbox(c(xmin = -68.0, xmax = -46.0, ymin = 43.0, ymax = 61.0), crs = 4326)
+searcharea <- st_as_sfc(atlantic_bbox) # Converts the box into a usable polygon layer
 
 monitoring_sites <- rbind(maritimes_tunicate_monitor%>% 
                             dplyr::select(StnLocation), 
                           gulf_tunicate_monitor %>% 
+                            dplyr::select(StnLocation),
+                          tunicates_sf%>% 
                             dplyr::select(StnLocation)
                           ) %>% 
   group_by(StnLocation) %>% 
   summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
   #unique() %>% 
-  mutate(StnLocation=gsub("[ \t]+$","",StnLocation)) %>% 
+  mutate(StnLocation = iconv(as.character(StnLocation), from = "WINDOWS-1252", to = "UTF-8", sub = ""),
+         StnLocation=gsub("[ \t]+$","",StnLocation)) %>% 
   st_transform(equidist) %>% 
   filter(geometry%>% 
            st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
            lengths()>0) %>% 
   st_transform(proj)
 
-monitoring <- rbind(maritimes_tunicate_monitor%>%
-                      mutate(Carcinus_maenas=0,
-                             Codium_fragile=0,
-                             Fucus_serratus=0,
-                             Diadumene_lineata=0)%>%
-                          as.data.table(),
-                        gulf_tunicate_monitor %>% 
-                      mutate(Ascidiella_aspersa=0,
-                             Diplosoma_listerianum=0,
-                             Didemnum_vexillum=0,
-                             Tricellaria_inopinata=0)%>%
-                          as.data.table()) %>% 
-  dplyr::select(-geometry) %>% 
-  unique()%>%
-  gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
-  group_by(Species,StnLocation,Year) %>% 
-  #unique()%>%
-  summarize(Presence = if_else(all(is.na(Presence)),
-                               FALSE,
-                               any(Presence>0,na.rm = TRUE))) %>%
-  ungroup() %>%
-  spread(key = "Species", value = "Presence") %>%
-  right_join(monitoring_sites,by = "StnLocation") %>%
-  st_sf() %>% 
-  mutate(StnLocation=gsub("[ \t]+$","",StnLocation))
+#leaflet::leaflet(monitoring_sites) %>% leaflet::addTiles() %>% leaflet::addMarkers()
 
-#leaflet::leaflet(monitoring_sites) %>% addTiles() %>% addMarkers()
+
+# monitoring <- rbind(maritimes_tunicate_monitor%>%
+#                       mutate(Carcinus_maenas=0,
+#                              Codium_fragile=0,
+#                              Fucus_serratus=0,
+#                              Diadumene_lineata=0)%>%
+#                           as.data.table(),
+#                         gulf_tunicate_monitor %>% 
+#                       mutate(Ascidiella_aspersa=0,
+#                              Diplosoma_listerianum=0,
+#                              Didemnum_vexillum=0,
+#                              Tricellaria_inopinata=0)%>%
+#                           as.data.table(),
+#                     tunicates_sf%>%
+#                       mutate(Carcinus_maenas=0,
+#                              Codium_fragile=0,
+#                              Fucus_serratus=0,
+#                              Diadumene_lineata=0)%>%
+#                       as.data.table()) %>% 
+#   dplyr::select(-geometry) %>% 
+#   unique()%>%
+#   gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
+#   group_by(Species,StnLocation,Year) %>% 
+#   #unique()%>%
+#   summarize(Presence = if_else(all(is.na(Presence)),
+#                                FALSE,
+#                                any(Presence>0,na.rm = TRUE))) %>%
+#   ungroup() %>%
+#   spread(key = "Species", value = "Presence") %>%
+#   right_join(monitoring_sites,by = "StnLocation") %>%
+#   st_sf() %>% 
+#   mutate(StnLocation=gsub("[ \t]+$","",StnLocation))
+
+monitoring <- bind_rows(
+  # Force Year and all species presence data to numeric types across all sets
+  maritimes_tunicate_monitor %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric)),
+  gulf_tunicate_monitor      %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric)),
+  tunicates_sf               %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric))
+) %>% 
+  # 1. Deduplicate the raw data layout early
+  unique() %>%
+  
+  # 2. Reshape from wide to long format to collapse duplicates cleanly
+  pivot_longer(
+    cols = !c(StnLocation, Year), 
+    names_to = "Species", 
+    values_to = "Presence"
+  ) %>%
+  
+  # 3. Handle duplicates: Aggregate presence status for identical combinations
+  group_by(Species, StnLocation, Year) %>% 
+  summarize(
+    Presence = if_else(
+      all(is.na(Presence)),
+      FALSE,
+      any(Presence > 0, na.rm = TRUE)
+    ),
+    .groups = "drop"
+  ) %>%
+  
+  # 4. Reshape back to wide format with clean TRUE/FALSE logical headers
+  pivot_wider(
+    names_from = Species, 
+    values_from = Presence, 
+    values_fill = FALSE
+  ) %>%
+  
+  # 5. Connect back to your master spatial grid layout
+  right_join(monitoring_sites, by = "StnLocation") %>%
+  st_sf() %>% 
+  mutate(StnLocation = iconv(as.character(StnLocation), to = "UTF-8", sub = "")) %>%
+  mutate(StnLocation = gsub("[ \t]+$", "", StnLocation))
+
+#leaflet::leaflet(monitoring) %>% leaflet::addTiles() %>% leaflet::addMarkers()
+
 
 saveRDS(monitoring_sites,"outputdata/monitoring_sites.rds")
 saveRDS(monitoring,"outputdata/monitoring.rds")
@@ -751,15 +843,15 @@ row.names(ns_monitoring_dist) <- NS$Lease_Identifier
 colnames(ns_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(ns_monitoring_dist,"outputdata/ns_monitoring_dist.rds")
 
-ns_metabarcoding_dist <- do.call(rbind,(lapply(NS$geometry %>%
+ns_eDNA_dist <- do.call(rbind,(lapply(NS$geometry %>%
                                               st_transform(equidist),
-                                            function(x) inwaterdistance(metabarcoding_sites %>%
+                                            function(x) inwaterdistance(eDNA_sites %>%
                                                                           st_transform(equidist),
                                                                         x,
                                                                         tr))))
-row.names(ns_metabarcoding_dist) <- NS$Lease_Identifier
-colnames(ns_metabarcoding_dist) <- metabarcoding_sites$StnLocation
-saveRDS(ns_metabarcoding_dist,"outputdata/ns_metabarcoding_dist.rds")
+row.names(ns_eDNA_dist) <- NS$Lease_Identifier
+colnames(ns_eDNA_dist) <- eDNA_sites$StnLocation
+saveRDS(ns_eDNA_dist,"outputdata/ns_eDNA_dist.rds")
 
 #### NB vs  incidentals and monitoring####
 
@@ -785,15 +877,15 @@ row.names(nb_monitoring_dist) <- NB$Lease_Identifier
 colnames(nb_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(nb_monitoring_dist,"outputdata/nb_monitoring_dist.rds")
 
-nb_metabarcoding_dist <- do.call(rbind,(lapply(NB$geometry %>%
+nb_eDNA_dist <- do.call(rbind,(lapply(NB$geometry %>%
                                                  st_transform(equidist),
-                                               function(x) inwaterdistance(metabarcoding_sites %>%
+                                               function(x) inwaterdistance(eDNA_sites %>%
                                                                              st_transform(equidist),
                                                                            x,
                                                                            tr))))
-row.names(nb_metabarcoding_dist) <- NB$Lease_Identifier
-colnames(nb_metabarcoding_dist) <- metabarcoding_sites$StnLocation
-saveRDS(nb_metabarcoding_dist,"outputdata/nb_metabarcoding_dist.rds")
+row.names(nb_eDNA_dist) <- NB$Lease_Identifier
+colnames(nb_eDNA_dist) <- eDNA_sites$StnLocation
+saveRDS(nb_eDNA_dist,"outputdata/nb_eDNA_dist.rds")
 
 #### PEI vs  incidentals and monitoring ####
 
@@ -819,12 +911,46 @@ row.names(pei_monitoring_dist) <- PEI$Lease_Identifier
 colnames(pei_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(pei_monitoring_dist,"outputdata/pei_monitoring_dist.rds")
 
-pei_metabarcoding_dist <- do.call(rbind,(lapply(PEI$geometry %>%
+pei_eDNA_dist <- do.call(rbind,(lapply(PEI$geometry %>%
                                                  st_transform(equidist),
-                                               function(x) inwaterdistance(metabarcoding_sites %>%
+                                               function(x) inwaterdistance(eDNA_sites %>%
                                                                              st_transform(equidist),
                                                                            x,
                                                                            tr))))
-row.names(pei_metabarcoding_dist) <- PEI$Lease_Identifier
-colnames(pei_metabarcoding_dist) <- metabarcoding_sites$StnLocation
-saveRDS(pei_metabarcoding_dist,"outputdata/pei_metabarcoding_dist.rds")
+row.names(pei_eDNA_dist) <- PEI$Lease_Identifier
+colnames(pei_eDNA_dist) <- eDNA_sites$StnLocation
+saveRDS(pei_eDNA_dist,"outputdata/pei_eDNA_dist.rds")
+
+#### PEI vs  incidentals and monitoring ####
+
+
+print("Calculating in water distances for NL")
+NL_incidental_dist <- do.call(rbind,(lapply(NL$geometry %>%
+                                               st_transform(equidist),
+                                             function(x) inwaterdistance(incidental_sites %>%
+                                                                           st_transform(equidist),
+                                                                         x,
+                                                                         tr))))
+row.names(NL_incidental_dist) <- NL$Lease_Identifier
+colnames(NL_incidental_dist) <- incidental_sites$StnLocation
+saveRDS(NL_incidental_dist,"outputdata/NL_incidental_dist.rds")
+
+NL_monitoring_dist <- do.call(rbind,(lapply(NL$geometry %>%
+                                               st_transform(equidist),
+                                             function(x) inwaterdistance(monitoring_sites %>%
+                                                                           st_transform(equidist),
+                                                                         x,
+                                                                         tr))))
+row.names(NL_monitoring_dist) <- NL$Lease_Identifier
+colnames(NL_monitoring_dist) <- monitoring_sites$StnLocation
+saveRDS(NL_monitoring_dist,"outputdata/NL_monitoring_dist.rds")
+
+# NL_eDNA_dist <- do.call(rbind,(lapply(NL$geometry %>%
+#                                          st_transform(equidist),
+#                                        function(x) inwaterdistance(eDNA_sites %>%
+#                                                                      st_transform(equidist),
+#                                                                    x,
+#                                                                    tr))))
+# row.names(NL_eDNA_dist) <- NL$Lease_Identifier
+# colnames(NL_eDNA_dist) <- eDNA_sites$StnLocation
+# saveRDS(NL_eDNA_dist,"outputdata/NL_eDNA_dist.rds")
