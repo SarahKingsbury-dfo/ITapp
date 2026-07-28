@@ -38,17 +38,23 @@ sf_use_s2(FALSE)
 # NB<-rbind(NB_shell, NB_finfish)
 # saveRDS(NB, "spatialdata/NB.rds")
 
+# QC<-st_read("spatialdata/QCAquaculture/QCAquaculture20260512.shp")%>%
+#   mutate(Lease_Identifier=DISPLAY_FR)%>%
+#   select(Lease_Identifier, geometry)%>%
+#   st_transform(proj)
+# saveRDS(QC, "spatialdata/QC.rds")
 
 NS <- readRDS("spatialdata/NS.rds")
 NB<- readRDS("spatialdata/NB.rds")
 PEI <- readRDS("spatialdata/PEI.rds")
 NL<- readRDS ("spatialdata/NL.rds")
+QC<-readRDS("spatialdata/QC.rds")
 
 species <- read.csv("commonnames.csv")
 
 # Load and clean up incidental data ---------------------------------------
 
-searcharea <- c(NS$geometry,NB$geometry,PEI$geometry, NL$geometry) %>% 
+searcharea <- c(NS$geometry,NB$geometry,PEI$geometry, NL$geometry, QC$geometry) %>% 
   st_combine() %>% 
   st_convex_hull() %>% 
   st_sfc()%>%
@@ -72,26 +78,27 @@ incidental_occ <- occ(query=species$Scientific_Name,
 
 incidental_occ<-incidental_occ%>%
   filter(!grepl("BOLD", name))%>% #remove any columns form the BOLD database
-  mutate(Species=case_when(name %in% c("Aequipecten irradians (Lamarck, 1819)","Argopecten irradians (Lamarck, 1819)", "Argopecten irradians", "Argopecten irradians irradians", "Aequipecten irradians sablensis A.H.Clarke, 1965" ,"Argopecten irradians sablensis (A.H.Clarke, 1965)") ~ "Argopecten_irradians",
+  mutate(Species=case_when(name %in% c("Argopecten irradians amplicostatus (Dall, 1898)", "Aequipecten irradians (Lamarck, 1819)","Argopecten irradians (Lamarck, 1819)", "Argopecten irradians", "Argopecten irradians irradians", "Aequipecten irradians sablensis A.H.Clarke, 1965" ,"Argopecten irradians sablensis (A.H.Clarke, 1965)") ~ "Argopecten_irradians",
                            name %in% c("Ascidiella aspersa (Müller, 1776)", "Ascidiella aspersa (M?ller, 1776)","Ascidiella aspersa" ) ~ "Ascidiella_aspersa",
                            name %in% c("BOLD:AAA7687","BOLD:ACL8382","Carcinus maenas (Linnaeus, 1758)", "Carcinus maenas") ~ "Carcinus_maenas",
                            name %in% c("Botrylloides violaceus Oka, 1927", "Botrylloides violaceus") ~ "Botrylloides_violaceus",
                            name %in% c("Botryllus schlosseri (Pallas, 1766)", "Botryllus schlosseri") ~ "Botryllus_schlosseri",
                            name %in% c("Caprella mutica Schurin, 1935","BOLD:AAE7686", "Caprella mutica") ~ "Caprella_mutica",
                            name %in% c("Carcinus maenas (Linnaeus, 1758)", "Carcinus maenas")~"Carcinus maenas",
-                           name %in% c("Ciona intestinalis (Linnaeus, 1767)","Ciona intestinalis tenella (Stimpson, 1852)","Ciona tenella (Stimpson, 1852)", "Ciona intestinalis" ) ~ "Ciona_intestinalis",
-                           name %in% c("Codium fragile (Suringar) Hariot","Codium fragile subsp. fragile","Codium fragile subsp. tomentosoides (Goor) P.C.Silva","Codium fragile tomentosoides", "Codium fragile", "Codium fragile (Suringar) Har." ,"Codium fragile var. fragile") ~ "Codium_fragile",
+                           name %in% c("Ciona intestinalis (Linnaeus, 1767)", "Ascidia intestinalis Linnaeus, 1767", "Ciona intestinalis tenella (Stimpson, 1852)","Ciona tenella (Stimpson, 1852)", "Ciona intestinalis" ) ~ "Ciona_intestinalis",
+                           name %in% c("Codium fragile fragile", "Codium fragile (Suringar) Hariot","Codium fragile subsp. fragile","Codium fragile subsp. tomentosoides (Goor) P.C.Silva","Codium fragile tomentosoides", "Codium fragile", "Codium fragile (Suringar) Har." ,"Codium fragile var. fragile") ~ "Codium_fragile",
                            name %in% c("Diadumene lineata (Verrill, 1869)", "Diadumene lineata")~"Diadumene_lineata",
                            name %in% c("Didemnum vexillum Kott, 2002", "Didemnum vexillum") ~ "Didemnum_vexillum",
-                           name %in% c("Diplosoma listerianum (Milne Edwards, 1841)", "Diplosoma listerianum") ~ "Diplosoma_listerianum",
+                           name %in% c("Leptoclinum gelatinosum Milne Edwards, 1841" , "Diplosoma listerianum (Milne Edwards, 1841)", "Diplosoma listerianum") ~ "Diplosoma_listerianum",
                            name %in% c("Fucus serratus L.", "Fucus serratus")~"Fucus_serratus",
                            name %in% c("Hemigrapsus sanguineus (De Haan, 1835)","Hemigrapsus sanguineus (de Haan, 1835)", "Hemigrapsus sanguineus") ~ "Hemigrapsus_sanguineus",
-                           name %in% c("Juxtacribrilina mutabilis (Ito, Onishi & Dick, 2015)","Juxtacribrilina mutabilis")~"Juxtacribrilina_mutabilis",
+                           name %in% c("Juxtacribrilina mutabilis (Ito, Onishi & Dick, 2015)","Cribrilina mutabilis Ito, Onishi & Dick, 2015", "Juxtacribrilina mutabilis")~"Juxtacribrilina_mutabilis",
                            name %in% c("Membranipora membranacea (Linnaeus, 1767)", "Flustra membranacea Linnaeus, 1767", "Membranipora membranacea") ~ "Membranipora_membranacea",
-                           name %in% c("Oncorhynchus mykiss (Walbaum, 1792)", "Oncorhynchus mykiss") ~ "Oncorhynchus_mykiss",
+                           name %in% c("Oncorhynchus mykiss (Walbaum, 1792)", "Salmo iridea Gibbons, 1855", "Salmo gairdnerii Richardson, 1836", "Oncorhynchus mykiss", "Oncorhynchus mykiss irideus (Gibbons, 1855)" ) ~ "Oncorhynchus_mykiss",
                            name %in% c("Ostrea edulis (Linnaeus, 1767)","Ostrea edulis Linnaeus, 1758","Ostrea edulis") ~ "Ostrea_edulis",
                            name %in% c("Sargassum muticum (Yendo) Fensholt", "Sargassum muticum")~"Sargassum_muticum",
                            name %in% c("Styela clava Herdman, 1881", "Styela clava") ~ "Styela_clava",
+                           name %in% c("Tricellaria inopinata d'Hondt & Occhipinti Ambrogi, 1985", "Tricellaria inopinata")~"Tricellaria_inopinata",
                            TRUE ~ name),
          Year=as.numeric(substr(date,1,4)))
 
@@ -377,40 +384,32 @@ eDNA_df<-rbindlist(edna_sf, fill=TRUE)%>%
   
 
 eDNA_sites<-eDNA_df%>% 
-                             dplyr::select(StnLocation, geometry)%>%
+  dplyr::select(StnLocation, geometry)%>%
   na.omit()%>%
   st_as_sf()%>%
   dplyr::group_by(StnLocation) %>% 
   dplyr::summarize(geometry = st_cast(st_centroid(st_union(geometry)),"POINT")) %>% 
   unique() %>% 
   sf::st_transform(equidist) %>% 
-   dplyr::filter(geometry%>% 
-           st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
-           lengths()>0) %>% 
+  dplyr::filter(geometry%>% 
+                  st_intersects(st_as_sfc(st_bbox(st_transform(searcharea,equidist)))) %>% 
+                  lengths()>0) %>% 
   st_transform(proj)
 
 
 eDNA<-eDNA_df%>%
     as.data.frame()%>%
-  dplyr::select(-geometry) %>% 
-  unique()%>%
-  gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
-  group_by(Species,StnLocation,Year) %>% 
-  spread(key = "Species", value = "Presence") %>%
-  right_join(eDNA_sites, by = "StnLocation") %>%
+  pivot_wider(
+    id_cols = c(StnLocation, Year, geometry),
+    names_from = Species, 
+    values_from = Presence,
+    # Safety feature: If a duplicate still exists, just fill with "1" instead of c("1", "1")
+    values_fn = list(Presence = function(x) "1"), 
+    # Optional: Fill stations where the species was NOT found with "0" instead of NA
+    values_fill = "0" 
+  )%>%
   st_sf() %>% 
   mutate(StnLocation=gsub("[ \t]+$","",StnLocation))
-
-eDNA <- eDNA_df %>%
-  as.data.frame() %>%
-  dplyr::select(-geometry) %>% 
-  unique() %>%
-  # If your starting data has a single column called 'Species' and a column called 'Presence'
-  # Pivot it wide so every species gets its own column
-  pivot_wider(names_from = Species, values_from = Presence, values_fill = FALSE) %>%
-  mutate(StnLocation = gsub("[ \t]+$", "", StnLocation)) %>%
-  right_join(eDNA_sites, by = "StnLocation") %>%
-  st_sf()
 
 saveRDS(eDNA_sites, "outputdata/eDNA_sites.rds")
 saveRDS(eDNA, "outputdata/eDNA.rds")
@@ -672,8 +671,36 @@ tunicates_sf <- tunicates_sf %>%
   st_set_crs(4326)%>%
   st_transform(proj)
 
+
+###QUebec Monitoring
+QC_monitoring<-read_csv("recentdata/quebec_itapp_collector_data.csv")%>%
+  st_as_sf(coords=c('longitude','latitude'),crs=4326) %>%
+  dplyr::rename(Year = year, StnLocation=station_name)%>% 
+  st_transform(proj) %>% 
+  filter(cover_index>0)%>%
+  mutate(Presence=TRUE)%>%
+  dplyr::select(-province, -ecoregion, -station_name_text, -cover_index)%>%
+  as.data.frame() %>%
+  
+  # 2. Pivot data wide
+  pivot_wider(
+    id_cols = c(StnLocation, Year, geometry),
+    names_from = species_name, 
+    values_from = Presence,
+    # Safety feature: If a duplicate still exists, just fill with "1" instead of c("1", "1")
+    values_fn = list(Presence = function(x) "1"), 
+    # Optional: Fill stations where the species was NOT found with "0" instead of NA
+    values_fill = "0" 
+  ) %>%
+  
+  st_as_sf() %>%
+  st_transform(proj)
+
 # Define a brand new, wide bounding box for Atlantic Canada (WGS84 degrees)
-atlantic_bbox <- st_bbox(c(xmin = -68.0, xmax = -46.0, ymin = 43.0, ymax = 61.0), crs = 4326)
+atlantic_bbox <- st_bbox(
+  c(xmin = -80.0, xmax = -52.0, ymin = 43.0, ymax = 63.0), 
+  crs = 4326
+)
 searcharea <- st_as_sfc(atlantic_bbox) # Converts the box into a usable polygon layer
 
 monitoring_sites <- rbind(maritimes_tunicate_monitor%>% 
@@ -681,6 +708,8 @@ monitoring_sites <- rbind(maritimes_tunicate_monitor%>%
                           gulf_tunicate_monitor %>% 
                             dplyr::select(StnLocation),
                           tunicates_sf%>% 
+                            dplyr::select(StnLocation),
+                          QC_monitoring%>%
                             dplyr::select(StnLocation)
                           ) %>% 
   group_by(StnLocation) %>% 
@@ -733,7 +762,8 @@ monitoring <- bind_rows(
   # Force Year and all species presence data to numeric types across all sets
   maritimes_tunicate_monitor %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric)),
   gulf_tunicate_monitor      %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric)),
-  tunicates_sf               %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric))
+  tunicates_sf               %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric)),
+  QC_monitoring %>% st_drop_geometry()%>%mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric))
 ) %>% 
   # 1. Deduplicate the raw data layout early
   unique() %>%
@@ -888,7 +918,7 @@ colnames(nb_eDNA_dist) <- eDNA_sites$StnLocation
 saveRDS(nb_eDNA_dist,"outputdata/nb_eDNA_dist.rds")
 
 #### PEI vs  incidentals and monitoring ####
-
+PEI <- sf::st_make_valid(PEI)
 
 print("Calculating in water distances for PEI")
 pei_incidental_dist <- do.call(rbind,(lapply(PEI$geometry %>%
@@ -911,17 +941,7 @@ row.names(pei_monitoring_dist) <- PEI$Lease_Identifier
 colnames(pei_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(pei_monitoring_dist,"outputdata/pei_monitoring_dist.rds")
 
-pei_eDNA_dist <- do.call(rbind,(lapply(PEI$geometry %>%
-                                                 st_transform(equidist),
-                                               function(x) inwaterdistance(eDNA_sites %>%
-                                                                             st_transform(equidist),
-                                                                           x,
-                                                                           tr))))
-row.names(pei_eDNA_dist) <- PEI$Lease_Identifier
-colnames(pei_eDNA_dist) <- eDNA_sites$StnLocation
-saveRDS(pei_eDNA_dist,"outputdata/pei_eDNA_dist.rds")
-
-#### PEI vs  incidentals and monitoring ####
+#### NL vs  incidentals and monitoring ####
 
 
 print("Calculating in water distances for NL")
@@ -945,12 +965,23 @@ row.names(NL_monitoring_dist) <- NL$Lease_Identifier
 colnames(NL_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(NL_monitoring_dist,"outputdata/NL_monitoring_dist.rds")
 
-# NL_eDNA_dist <- do.call(rbind,(lapply(NL$geometry %>%
-#                                          st_transform(equidist),
-#                                        function(x) inwaterdistance(eDNA_sites %>%
-#                                                                      st_transform(equidist),
-#                                                                    x,
-#                                                                    tr))))
-# row.names(NL_eDNA_dist) <- NL$Lease_Identifier
-# colnames(NL_eDNA_dist) <- eDNA_sites$StnLocation
-# saveRDS(NL_eDNA_dist,"outputdata/NL_eDNA_dist.rds")
+#### QC vs  incidental and monitoring ####
+QC_incidental_dist <- do.call(rbind,(lapply(QC$geometry %>%
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(incidental_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
+row.names(QC_incidental_dist) <- QC$Lease_Identifier
+colnames(QC_incidental_dist) <- incidental_sites$StnLocation
+saveRDS(QC_incidental_dist,"outputdata/QC_incidental_dist.rds")
+
+QC_monitoring_dist <- do.call(rbind,(lapply(QC$geometry %>%
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(monitoring_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
+row.names(QC_monitoring_dist) <- QC$Lease_Identifier
+colnames(QC_monitoring_dist) <- monitoring_sites$StnLocation
+saveRDS(QC_monitoring_dist,"outputdata/QC_monitoring_dist.rds")
