@@ -17,7 +17,8 @@ print("Warning: Initial installation will take multiple hours!")
 
 print("Loading data")
 proj <- "+proj=longlat +datum=WGS84"
-equidist <- "+proj=eqdc +lon_0=-58.50 +lat_0=48.00 +lat_1=44.00 +lat_2=52.00 +x_0=1000000 +y_0=1000000 +datum=WGS84 +units=m +no_defs"
+#equidist <- "+proj=eqdc +lon_0=-58.50 +lat_0=48.00 +lat_1=44.00 +lat_2=52.00 +x_0=1000000 +y_0=1000000 +datum=WGS84 +units=m +no_defs"
+equidist<-equidist <- "+proj=eqdc +lon_0=-66.00 +lat_0=53.00 +lat_1=47.00 +lat_2=59.00 +x_0=2000000 +y_0=2000000 +datum=WGS84 +units=m +no_defs"
 sf_use_s2(FALSE)
 
 # NS<-st_read("spatialdata/NS_Aqua_lease_2026/geo_export_95bfaf74-c1b7-4c65-a258-d1cb7076637e.shp")%>%
@@ -964,6 +965,8 @@ NL_monitoring_dist <- do.call(rbind,(lapply(NL$geometry %>%
                                                                            st_transform(equidist),
                                                                          x,
                                                                          tr))))
+
+
 row.names(NL_monitoring_dist) <- NL$Lease_Identifier
 colnames(NL_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(NL_monitoring_dist,"outputdata/NL_monitoring_dist.rds")
