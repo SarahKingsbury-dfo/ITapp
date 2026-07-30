@@ -919,6 +919,7 @@ saveRDS(nb_eDNA_dist,"outputdata/nb_eDNA_dist.rds")
 
 #### PEI vs  incidentals and monitoring ####
 PEI <- sf::st_make_valid(PEI)
+PEI <- PEI[sf::st_geometry_type(PEI) == "POLYGON", ]
 
 print("Calculating in water distances for PEI")
 pei_incidental_dist <- do.call(rbind,(lapply(PEI$geometry %>%
