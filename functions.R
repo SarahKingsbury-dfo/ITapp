@@ -106,19 +106,19 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
 }
 
 #### basemap eDNA ####
-basemap_eDNA <- function(leases, metabarcoding, metabarcodingsp,...){
+basemap_eDNA <- function(leases, eDNA, eDNAsp,...){
   #browser()
-  sp_eDNA <- metabarcodingsp[metabarcodingsp %in% names(metabarcoding)]
+  sp_eDNA <- eDNAsp[eDNAsp %in% names(eDNA)]
   
   palette_for_minicharts_eDNA <- species_palette[sp_eDNA]
   
   leaflet(leases,...) %>%
     addTiles() %>%
     addPolygons(popup = paste("Lease:",leases$Lease_Identifier),group = "Leases") %>%
-    addMinicharts(st_coordinates(metabarcoding$geometry)[,1],
-                  st_coordinates(metabarcoding$geometry)[,2],
+    addMinicharts(st_coordinates(eDNA$geometry)[,1],
+                  st_coordinates(eDNA$geometry)[,2],
                   type="pie",
-                  chartdata=as.data.frame(metabarcoding)[,sp_eDNA],
+                  chartdata=as.data.frame(eDNA)[,sp_eDNA],
                   colorPalette = unname(palette_for_minicharts_eDNA),
                   legend = TRUE,
                   legendPosition = 'topright') %>%

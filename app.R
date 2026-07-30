@@ -15,9 +15,9 @@ proj <- "+proj=longlat +datum=WGS84"
 
 
 ### download provincial lease data or just open the saved version
-if(!file.exists("spatialdata/NS.rds")){
-  if(!require("devtools")) install.packages("devtools")
-  if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
+# if(!file.exists("spatialdata/NS.rds")){
+#   if(!require("devtools")) install.packages("devtools")
+#   if(!require("esri2sf")) devtools::install_github("yonghah/esri2sf")
   # NS <- esri2sf::esri2sf('https://services.arcgis.com/nQHSMRVltyfsxeFe/ArcGIS/rest/services/Marine_Lease_Boundary_Database_Shellfish_View/FeatureServer/0') %>% 
     # filter(grepl("Issued",SiteStatus)|grepl("Propose",SiteStatus)|grepl("Approved Option",SiteStatus)) %>%
     # # filter(SiteStatus=="Issued") %>%
@@ -26,17 +26,17 @@ if(!file.exists("spatialdata/NS.rds")){
     # rename(geometry=geoms)
 
 #New Nova Scotia Aquaculture lease sites downloaded from https://ouvert.canada.ca/data/dataset/bf6287be-3fd1-db4d-60a4-7d80abc996cb/resource/bd83f1d3-9694-4b29-9aa6-bb4c40a1e8ce
-  NS<-sf::read_sf('spatialdata/tempdata_shp/geo_export_1f1e3956-3190-4fc6-871b-706757deb026.shp')%>%
-    #filter(grepl("Issued",SiteStatus)|grepl("Propose",SiteStatus)|grepl("Approved Option",SiteStatus)) %>% #Now only contains Issued and Issued Experimental
-    # filter(SiteStatus=="Issued") %>%
-    mutate(Lease_Identifier=license_le) %>%
-    st_transform(proj)
-    
-  NB <- bind_rows(esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/0') %>% rename(Lease_Identifier = MSNO),
-                  esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/1') %>% rename(Lease_Identifier = LPNO),
-                  esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/2') %>% rename(Lease_Identifier = MSNO)) %>% 
-    st_transform(proj) %>% 
-    rename(geometry=geoms)
+  # NS<-sf::read_sf('spatialdata/tempdata_shp/geo_export_1f1e3956-3190-4fc6-871b-706757deb026.shp')%>%
+  #   #filter(grepl("Issued",SiteStatus)|grepl("Propose",SiteStatus)|grepl("Approved Option",SiteStatus)) %>% #Now only contains Issued and Issued Experimental
+  #   # filter(SiteStatus=="Issued") %>%
+  #   mutate(Lease_Identifier=license_le) %>%
+  #   st_transform(proj)
+  #   
+  # NB <- bind_rows(esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/0') %>% rename(Lease_Identifier = MSNO),
+  #                 esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/1') %>% rename(Lease_Identifier = LPNO),
+  #                 esri2sf::esri2sf('https://gis-erd-der.gnb.ca/arcgis/rest/services/MASMPS/MASMPS_service/MapServer/2') %>% rename(Lease_Identifier = MSNO)) %>% 
+  #   st_transform(proj) %>% 
+  #   rename(geometry=geoms)
 
   #As of March 2025, no open source PEI lease mapping layers are available. WIll need to rely on the existing layer. 
   # raw <- jsonlite::read_json(
@@ -57,15 +57,18 @@ if(!file.exists("spatialdata/NS.rds")){
   #   mutate(Lease_Identifier=Lease) %>% 
   #   st_transform(proj)
   
-  saveRDS(NS,"spatialdata/NS.rds")
-  saveRDS(NB,"spatialdata/NB.rds")
- # saveRDS(PEI,"spatialdata/PEI.rds")
-  
-  
-}
+#   saveRDS(NS,"spatialdata/NS.rds")
+#   saveRDS(NB,"spatialdata/NB.rds")
+#  # saveRDS(PEI,"spatialdata/PEI.rds")
+#   
+#   
+# }
 NS <- readRDS("spatialdata/NS.rds")
 NB <- readRDS("spatialdata/NB.rds")
 PEI <- readRDS("spatialdata/PEI.rds")
+NL<- readRDS("spatialdata/NL.rds")
+QC<- readRDS("spatialdata/QC.rds")
+
 
 
 AIS <- read.csv("commonnames.csv")
@@ -87,21 +90,32 @@ product_sp <- as.list(c(unique(sp_treatments$Product_treated),
 
 publicdata_sites <- readRDS("outputdata/publicdata_sites.rds")
 publicdata <- readRDS("outputdata/publicdata.rds")
+
 incidental_sites <- readRDS("outputdata/incidental_sites.rds")
 incidental <- readRDS("outputdata/incidental.rds")
+
 monitoring_sites <- readRDS("outputdata/monitoring_sites.rds")
 monitoring <- readRDS("outputdata/monitoring.rds")
-metabarcoding_sites<-readRDS("outputdata/metabarcoding_sites.rds")
-metabarcoding<-readRDS("outputdata/metabarcoding.rds")
+
+eDNA_sites<-readRDS("outputdata/eDNA_sites.rds")
+eDNA<-readRDS("outputdata/eDNA.rds")
+
 ns_incidental_dist <- readRDS("outputdata/ns_incidental_dist.rds")
 ns_monitoring_dist <- readRDS("outputdata/ns_monitoring_dist.rds")
-ns_metabarcoding_dist<-readRDS("outputdata/ns_metabarcoding_dist.rds")
+ns_eDNA_dist<-readRDS("outputdata/ns_eDNA_dist.rds")
+
 nb_incidental_dist <- readRDS("outputdata/nb_incidental_dist.rds")
 nb_monitoring_dist <- readRDS("outputdata/nb_monitoring_dist.rds")
-nb_metabarcoding_dist<-readRDS("outputdata/nb_metabarcoding_dist.rds")
+nb_eDNA_dist<-readRDS("outputdata/nb_eDNA_dist.rds")
+
 pei_incidental_dist <- readRDS("outputdata/pei_incidental_dist.rds")
 pei_monitoring_dist <- readRDS("outputdata/pei_monitoring_dist.rds")
-pei_metabarcoding_dist<-readRDS("outputdata/pei_metabarcoding_dist.rds")
+
+nl_monitoring_dist<- readRDS("outputdata/NL_monitoring_dist.rds")
+nl_incidental_dist<- readRDS("outputdata/NL_incidental_dist.rds")
+
+qc_monitoring_dist<- readRDS("outputdata/QC_monitoring_dist.rds")
+qc_incidental_dist<- readRDS("outputdata/QC_incidental_dist.rds")
 
 
 source("functions.R")
@@ -117,7 +131,7 @@ ui <- navbarPage(
              sidebarPanel(
                selectInput(inputId = "origprov",
                            label = "Choose a Province:",
-                           choices = c("NS", "NB", "PEI")),
+                           choices = c("NS", "NB", "PEI", "NL", "QC")),
                selectInput(inputId = "origlease",
                            label = "Choose a lease:",
                            choices = NS$Lease_Identifier),
@@ -149,7 +163,7 @@ ui <- navbarPage(
              sidebarPanel(
                selectInput(inputId = "destprov",
                            label = "Choose a Province:",
-                           choices = c("NS", "NB", "PEI")),
+                           choices = c("NS", "NB", "PEI", "NL", "QC")),
                selectInput(inputId = "destlease",
                            label = "Choose a lease:",
                            choices = NS$Lease_Identifier),
@@ -226,7 +240,7 @@ ui <- navbarPage(
            numericInput(inputId = "publicyear",
                         label = "Ignore citizen science observation records older than:",
                         value = 2020),
-           numericInput(inputId = "metabarcodeyear",
+           numericInput(inputId = "eDNAyear",
                         label = "Ignore eDNA observation records older than:",
                         value = 2020)
   ),
@@ -273,11 +287,11 @@ server <- function(input, output, session) {
       inner_join(monitoring_sites,by = "StnLocation")
   })
   
-  #filtering metabarcoding data data
-  metabarcoding_filtered <- reactive({
+  #filtering eDNA data data
+  eDNA_filtered <- reactive({
     #browser()
-    metabarcoding %>% 
-      filter(Year>=input$metabarcodeyear) %>% 
+    eDNA %>% 
+      filter(Year>=input$eDNAyear) %>% 
       as.data.table() %>% 
       dplyr::select(-geometry) %>%
       gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
@@ -297,7 +311,7 @@ server <- function(input, output, session) {
       mutate(Presence=as.character(Presence)) %>%
       tidyr::pivot_longer(cols = c(Presence,History)) %>%
       tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
-      inner_join(metabarcoding_sites,by = "StnLocation")
+      inner_join(eDNA_sites,by = "StnLocation")
   })
   
 #filtering incidental reports by by DFO or made to DFO's email inboxs that had photo evidence
@@ -496,28 +510,36 @@ server <- function(input, output, session) {
     switch(input$origprov,
            "NS" = NS,
            "NB" = NB,
-           "PEI" = PEI)
+           "PEI" = PEI,
+           "NL"=NL,
+           "QC"=QC)
   })
   
   destprovInput <- reactive({
     switch(input$destprov,
            "NS" = NS,
            "NB" = NB,
-           "PEI" = PEI)
+           "PEI" = PEI,
+           "NL"=NL,
+           "QC"=QC)
   })
   
   monitoring_dist_orig <- reactive({
     switch(input$origprov,
            "NS" = ns_monitoring_dist,
            "NB" = nb_monitoring_dist,
-           "PEI" = pei_monitoring_dist)
+           "PEI" = pei_monitoring_dist,
+           "NL"=nl_monitoring_dist,
+           "QC"=qc_monitoring_dist)
   })
   
   incidental_dist_orig <- reactive({
     switch(input$origprov,
            "NS" = ns_incidental_dist,
            "NB" = nb_incidental_dist,
-           "PEI" = pei_incidental_dist)
+           "PEI" = pei_incidental_dist,
+           "NL" = nl_incidental_dist,
+           "QC" = qc_incidental_dist)
   })
   
 
@@ -525,14 +547,18 @@ server <- function(input, output, session) {
     switch(input$destprov,
            "NS" = ns_monitoring_dist,
            "NB" = nb_monitoring_dist,
-           "PEI" = pei_monitoring_dist)
+           "PEI" = pei_monitoring_dist,
+           "NL"=nl_monitoring_dist,
+           "QC"=qc_monitoring_dist)
   })
   
   incidental_dist_dest <- reactive({
     switch(input$destprov,
            "NS" = ns_incidental_dist,
            "NB" = nb_incidental_dist,
-           "PEI" = pei_incidental_dist)
+           "PEI" = pei_incidental_dist,
+           "NL" = nl_incidental_dist,
+           "QC" = qc_incidental_dist)
   })
   
   #### Leaflet maps ####
@@ -543,7 +569,9 @@ server <- function(input, output, session) {
     
     all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
                         dplyr::select(NB,Lease_Identifier),
-                        dplyr::select(PEI,Lease_Identifier))
+                        dplyr::select(PEI,Lease_Identifier),
+                        dplyr::select(NL,Lease_Identifier),
+                        dplyr::select(QC,Lease_Identifier))
     basemap(leases=all_leases,
             incidentals=incidental_filtered(),
             monitoring=monitoring_filtered() %>% filter(name=="Presence") %>% 
@@ -558,12 +586,14 @@ server <- function(input, output, session) {
     
     all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
                         dplyr::select(NB,Lease_Identifier),
-                        dplyr::select(PEI,Lease_Identifier))
+                        dplyr::select(PEI,Lease_Identifier),
+                        dplyr::select(NL,Lease_Identifier),
+                        dplyr::select(QC,Lease_Identifier))
     basemap_eDNA(leases=all_leases,
-                 metabarcoding=metabarcoding_filtered() %>% filter(name=="Presence") %>% 
+                 eDNA=eDNA_filtered() %>% filter(name=="Presence") %>% 
                    dplyr::select(-name) %>% 
                    mutate(across(2:(ncol(.)-1),as.logical)),
-            metabarcodingsp=AIS$R_Name)
+            eDNAsp=AIS$R_Name)
   })
   
   #Public Reports map
@@ -572,7 +602,9 @@ server <- function(input, output, session) {
     
     all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
                         dplyr::select(NB,Lease_Identifier),
-                        dplyr::select(PEI,Lease_Identifier))
+                        dplyr::select(PEI,Lease_Identifier),
+                        dplyr::select(NL,Lease_Identifier),
+                        dplyr::select(QC,Lease_Identifier))
     basemap_pReport(leases=all_leases,
                  publicdata=publicdata_filtered(),
                  publicdatasp=AIS$R_Name)

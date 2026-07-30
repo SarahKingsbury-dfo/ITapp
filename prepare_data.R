@@ -25,10 +25,13 @@ sf_use_s2(FALSE)
 #saveRDS(NS, "spatialdata/NS.rds")
 
 # NL<- st_read("spatialdata/NL_lease/Fisheries_and_Aquaculture_-_Licensed_Fish_Processors_and_Aquaculture_Sites.shp")%>%
-#   mutate(Lease_Indentifier=LICENSES)%>%
+#   mutate(Lease_Identifier=LICENSES)%>%
 #   st_transform(proj)
+# 
+# 
+# NL$Lease_Indentifier<-make.unique(as.character(NL$Lease_Indentifier))
+# 
 # saveRDS(NL, "spatialdata/NL.rds")
-
 
 # NB_shell<-st_read("spatialdata/NB_lease/Shellfish.geojson")%>%
 #   mutate(Lease_Identifier=SITE_NUMBER)%>%
@@ -943,7 +946,6 @@ colnames(pei_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(pei_monitoring_dist,"outputdata/pei_monitoring_dist.rds")
 
 #### NL vs  incidentals and monitoring ####
-
 
 print("Calculating in water distances for NL")
 NL_incidental_dist <- do.call(rbind,(lapply(NL$geometry %>%
