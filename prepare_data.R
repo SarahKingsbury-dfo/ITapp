@@ -42,7 +42,7 @@ sf_use_s2(FALSE)
 #   st_transform(proj)
 # 
 # 
-# NL$Lease_Indentifier<-make.unique(as.character(NL$Lease_Indentifier))
+# NL$Lease_Identifier<-make.unique(as.character(NL$Lease_Identifier)) #NL leases are not uniquely coded. Therefore, I needed ti force uniqueness. 
 # 
 # saveRDS(NL, "spatialdata/NL.rds")
 
@@ -78,6 +78,78 @@ searcharea <- c(NS$geometry,NB$geometry,PEI$geometry, NL$geometry, QC$geometry) 
   st_buffer(100000) %>% 
   st_transform(proj)
 
+####Read in and amalgamate NL data
+NL_csv<-c("recentdata/NL AIS Open Data Golden star Tunicate 2006 to 2025.csv",
+          "recentdata/NL AIS Open Data Vase Tunicate 2006 to 2025.csv",
+          "recentdata/NL AIS Open Data Violet Tunicate 2006 to 2025.csv")
+
+# 2. Read all files into a named list (retaining file names for tracking)
+NL_tunicates_list <- map(set_names(NL_csv), \(file) {
+  read_csv(file, col_types = cols(.default = "c")) # Force columns to text to prevent merge crashes
+})
+
+# 3. Combine the list into one master dataframe
+tunicates_df <- list_rbind(NL_tunicates_list, names_to = "source_file") %>%
+  # Fix column classes that shouldn't be characters
+  mutate(
+    decimalLongitude = as.numeric(decimalLongitude),
+    decimalLatitude = as.numeric(decimalLatitude),
+    coordinateUncertaintyInMeters = as.integer(coordinateUncertaintyInMeters)
+  )
+
+# 4. (Optional) Convert the combined dataframe into a spatial 'sf' object
+tunicates_sf <- tunicates_df %>%
+  filter(!is.na(decimalLongitude) & !is.na(decimalLatitude)) %>% # Drop missing coordinates
+  st_as_sf(coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)%>%
+  filter(validated == "yes")%>%
+  mutate(Species=case_when(vernacularNameEN == "golden star tunicate" ~"Botryllus_schlosseri",
+                           vernacularNameEN =="vase tunicate"~"Ciona_intestinalis",
+                           vernacularNameEN =="violet tunicate"~"Botrylloides_violaceus"),
+         Presence=case_when(occurrenceStatus=="detected"~1,
+                            occurrenceStatus=="not detected"~0),
+         Year = as.integer(str_extract(eventDate2, "^\\d{4}")))%>%
+  rename("StnLocation"="locality")%>%
+  select (Year, Species, geometry, Presence, StnLocation, samplingProtocol)%>%
+  filter(!is.na(Species)) %>% # Drop any unmapped species to prevent an 'NA' column
+  
+  # 4. Pivot from Long to Wide format
+  pivot_wider(
+    id_cols = c(StnLocation, Year, geometry, samplingProtocol),
+    names_from = Species,
+    values_from = Presence,
+    values_fn = max,        # Prevents c(1,1) by taking the maximum presence value
+    values_fill = 0         # Fills missing species records at a station with 0
+  )
+
+# 1. Extract the coordinates and reverse their matrix columns
+flipped_coords <- st_coordinates(tunicates_sf)[, c("Y", "X")]
+
+# 2. Convert the reversed coordinates back into clean POINT geometries
+corrected_geometry <- st_sfc(
+  lapply(1:nrow(flipped_coords), function(i) st_point(flipped_coords[i, ])),
+  crs = 4326
+)
+
+# 3. Replace the broken inverted geometry column with the corrected one
+st_geometry(tunicates_sf) <- corrected_geometry
+
+#4. Remove StnLocation errors such as spaces 
+
+tunicates_sf$StnLocation <- iconv(tunicates_sf$StnLocation, from = "latin1", to = "UTF-8")
+tunicates_sf$StnLocation <- gsub("’", "'", tunicates_sf$StnLocation)
+
+#Now split NL data into incidental and eDNA datasets
+
+NL_incidental<-tunicates_sf%>%
+  filter(samplingProtocol != "eDNA")%>%
+  select(-samplingProtocol)
+
+#Important note: eDNA alone did not detect any tunicates and therefore, there is no need to include this in the eDNA section below. 
+NL_eDNA<-tunicates_sf%>%
+  filter(samplingProtocol == "eDNA")%>%
+  select(-samplingProtocol)
+
+####incidental reports confirmed by DFO Science
 
 incidental_occ <- occ(query=species$Scientific_Name,
                       from=c("gbif","inat"),
@@ -293,6 +365,8 @@ incidental_sites <- rbind(
   mar_incidental%>%
     dplyr::select(StnLocation),
   NS_RAS_2025%>%
+    dplyr::select(StnLocation),
+  NL_incidental%>%
     dplyr::select(StnLocation)
 )%>%
   na.omit()%>%
@@ -333,6 +407,9 @@ incidental <-  dplyr::bind_rows(
     as.data.table(),
   NS_RAS_2025%>%
     dplyr::mutate(across(.fns=as.character))%>%
+    as.data.table(),
+  NL_incidental%>%
+    dplyr::mutate(across(.fns=as.character))%>%
     as.data.table()
 ) %>% 
   unique() %>%
@@ -340,6 +417,8 @@ incidental <-  dplyr::bind_rows(
   dplyr::right_join(incidental_sites,by = "StnLocation") %>% 
   st_sf()%>%
   na.omit()
+
+leaflet::leaflet(incidental_sites) %>% leaflet::addTiles() %>% leaflet::addMarkers()
 
 saveRDS(incidental_sites,"outputdata/incidental_sites.rds")
 saveRDS(incidental,"outputdata/incidental.rds")
@@ -368,6 +447,8 @@ publicdata<- incidental_occ %>%
 
 saveRDS(publicdata_sites,"outputdata/publicdata_sites.rds")
 saveRDS(publicdata,"outputdata/publicdata.rds")
+
+leaflet::leaflet(publicdata_sites) %>% leaflet::addTiles() %>% leaflet::addMarkers()
 
 #Genomics Data
 
@@ -618,75 +699,6 @@ gulf_tunicate_monitor<-rbind(gulf_tunicate_monitor%>%mutate(Juxtacribrilina_muta
   st_as_sf()%>%
   st_transform(proj)
 
-NL_csv<-c("recentdata/NL AIS Open Data Golden star Tunicate 2006 to 2025.csv",
-          "recentdata/NL AIS Open Data Vase Tunicate 2006 to 2025.csv",
-          "recentdata/NL AIS Open Data Violet Tunicate 2006 to 2025.csv")
-
-# 2. Read all files into a named list (retaining file names for tracking)
-NL_tunicates_list <- map(set_names(NL_csv), \(file) {
-  read_csv(file, col_types = cols(.default = "c")) # Force columns to text to prevent merge crashes
-})
-
-# 3. Combine the list into one master dataframe
-tunicates_df <- list_rbind(NL_tunicates_list, names_to = "source_file") %>%
-  # Fix column classes that shouldn't be characters
-  mutate(
-    decimalLongitude = as.numeric(decimalLongitude),
-    decimalLatitude = as.numeric(decimalLatitude),
-    coordinateUncertaintyInMeters = as.integer(coordinateUncertaintyInMeters)
-  )
-
-# 4. (Optional) Convert the combined dataframe into a spatial 'sf' object
-tunicates_sf <- tunicates_df %>%
-  filter(!is.na(decimalLongitude) & !is.na(decimalLatitude)) %>% # Drop missing coordinates
-  st_as_sf(coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)%>%
-  filter(validated == "yes")%>%
-  mutate(Species=case_when(vernacularNameEN == "golden star tunicate" ~"Botryllus_schlosseri",
-                           vernacularNameEN =="vase tunicate"~"Ciona_intestinalis",
-                           vernacularNameEN =="violet tunicate"~"Botrylloides_violaceus"),
-         Presence=case_when(occurrenceStatus=="detected"~1,
-                            occurrenceStatus=="not detected"~0),
-         Year = as.integer(str_extract(eventDate2, "^\\d{4}")))%>%
-  rename("StnLocation"="locality")%>%
-  select (Year, Species, geometry, Presence, StnLocation)%>%
-  filter(!is.na(Species)) %>% # Drop any unmapped species to prevent an 'NA' column
-  
-  # 4. Pivot from Long to Wide format
-  pivot_wider(
-    id_cols = c(StnLocation, Year, geometry),
-    names_from = Species,
-    values_from = Presence,
-    values_fn = max,        # Prevents c(1,1) by taking the maximum presence value
-    values_fill = 0         # Fills missing species records at a station with 0
-  )
-
-# 1. Extract the coordinates and reverse their matrix columns
-flipped_coords <- st_coordinates(tunicates_sf)[, c("Y", "X")]
-
-# 2. Convert the reversed coordinates back into clean POINT geometries
-corrected_geometry <- st_sfc(
-  lapply(1:nrow(flipped_coords), function(i) st_point(flipped_coords[i, ])),
-  crs = 4326
-)
-
-# 3. Replace the broken inverted geometry column with the corrected one
-st_geometry(tunicates_sf) <- corrected_geometry
-
-# 1. Identify which column names exist in maritimes but are missing in tunicates
-missing_cols <- setdiff(names(maritimes_tunicate_monitor), names(tunicates_sf))
-
-# 2. Dynamically create the missing columns filled with 0
-tunicates_sf <- tunicates_sf %>%
-  # Creates a list of 0s for each missing column name and adds them all at once
-  add_column(!!!set_names(rep(0, length(missing_cols)), missing_cols)) %>%
-  # Optional: Reorder columns to exactly match the maritimes dataset layout
-  select(all_of(names(maritimes_tunicate_monitor))) %>%
-  st_transform(proj)
-
-tunicates_sf <- tunicates_sf %>% 
-  st_set_crs(4326)%>%
-  st_transform(proj)
-
 
 ###QUebec Monitoring
 QC_monitoring<-read_csv("recentdata/quebec_itapp_collector_data.csv")%>%
@@ -723,8 +735,8 @@ monitoring_sites <- rbind(maritimes_tunicate_monitor%>%
                             dplyr::select(StnLocation), 
                           gulf_tunicate_monitor %>% 
                             dplyr::select(StnLocation),
-                          tunicates_sf%>% 
-                            dplyr::select(StnLocation),
+                          # tunicates_sf%>% 
+                          #   dplyr::select(StnLocation),
                           QC_monitoring%>%
                             dplyr::select(StnLocation)
                           ) %>% 
@@ -778,7 +790,7 @@ monitoring <- bind_rows(
   # Force Year and all species presence data to numeric types across all sets
   maritimes_tunicate_monitor %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric)),
   gulf_tunicate_monitor      %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric)),
-  tunicates_sf               %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric)),
+ # tunicates_sf               %>% st_drop_geometry() %>% mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric)),
   QC_monitoring %>% st_drop_geometry()%>%mutate(Year = as.integer(Year), across(!StnLocation & !Year, as.numeric))
 ) %>% 
   # 1. Deduplicate the raw data layout early
@@ -859,7 +871,7 @@ print("Setting up transition matrix")
 #             #ext=extent(st_bbox(searcharea %>% st_transform(equidist))),
 #             res = 1000)
 
-searchbox <- monitoring_sites %>%
+searchbox <- publicdata_sites %>%
   st_transform(equidist) %>%
   st_bbox() %>%
   st_as_sfc() %>%          # convert bbox to polygon
@@ -878,7 +890,7 @@ tr <- transition(r, mean, directions = 16, symm=TRUE)
 saveRDS(tr,"outputdata/transition.rds")
 
 
-#### NS vs  incidentals and monitoring and metabarcoding ####
+####calculate incidental distance for each province ####
 
 print("Calculating in water distances for NS")
 ns_incidental_dist <- do.call(rbind,(lapply(NS$geometry %>%
@@ -893,28 +905,6 @@ colnames(ns_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(ns_incidental_dist,"outputdata/ns_incidental_dist.rds")
 
 
-ns_monitoring_dist <- do.call(rbind,(lapply(NS$geometry %>%
-                                              st_transform(equidist),
-                                            function(x) inwaterdistance(monitoring_sites %>%
-                                                                          st_transform(equidist),
-                                                                        x,
-                                                                        tr))))
-row.names(ns_monitoring_dist) <- NS$Lease_Identifier
-colnames(ns_monitoring_dist) <- monitoring_sites$StnLocation
-saveRDS(ns_monitoring_dist,"outputdata/ns_monitoring_dist.rds")
-
-ns_eDNA_dist <- do.call(rbind,(lapply(NS$geometry %>%
-                                              st_transform(equidist),
-                                            function(x) inwaterdistance(eDNA_sites %>%
-                                                                          st_transform(equidist),
-                                                                        x,
-                                                                        tr))))
-row.names(ns_eDNA_dist) <- NS$Lease_Identifier
-colnames(ns_eDNA_dist) <- eDNA_sites$StnLocation
-saveRDS(ns_eDNA_dist,"outputdata/ns_eDNA_dist.rds")
-
-#### NB vs  incidentals and monitoring####
-
 print("Calculating in water distances for NB")
 nb_incidental_dist <- do.call(rbind,(lapply(NB$geometry %>%
                                               st_transform(equidist),
@@ -926,28 +916,6 @@ row.names(nb_incidental_dist) <- NB$Lease_Identifier
 colnames(nb_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(nb_incidental_dist,"outputdata/nb_incidental_dist.rds")
 
-
-nb_monitoring_dist <- do.call(rbind,(lapply(NB$geometry %>%
-                                              st_transform(equidist),
-                                            function(x) inwaterdistance(monitoring_sites %>%
-                                                                          st_transform(equidist),
-                                                                        x,
-                                                                        tr))))
-row.names(nb_monitoring_dist) <- NB$Lease_Identifier
-colnames(nb_monitoring_dist) <- monitoring_sites$StnLocation
-saveRDS(nb_monitoring_dist,"outputdata/nb_monitoring_dist.rds")
-
-nb_eDNA_dist <- do.call(rbind,(lapply(NB$geometry %>%
-                                                 st_transform(equidist),
-                                               function(x) inwaterdistance(eDNA_sites %>%
-                                                                             st_transform(equidist),
-                                                                           x,
-                                                                           tr))))
-row.names(nb_eDNA_dist) <- NB$Lease_Identifier
-colnames(nb_eDNA_dist) <- eDNA_sites$StnLocation
-saveRDS(nb_eDNA_dist,"outputdata/nb_eDNA_dist.rds")
-
-#### PEI vs  incidentals and monitoring ####
 PEI <- sf::st_make_valid(PEI)
 PEI <- PEI[sf::st_geometry_type(PEI) == "POLYGON", ]
 
@@ -962,6 +930,68 @@ row.names(pei_incidental_dist) <- PEI$Lease_Identifier
 colnames(pei_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(pei_incidental_dist,"outputdata/pei_incidental_dist.rds")
 
+print("Calculating in water distances for NL")
+NL_incidental_dist <- do.call(rbind,(lapply(NL$geometry %>%
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(incidental_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
+row.names(NL_incidental_dist) <- NL$Lease_Identifier
+colnames(NL_incidental_dist) <- incidental_sites$StnLocation
+saveRDS(NL_incidental_dist,"outputdata/NL_incidental_dist.rds")
+
+QC_incidental_dist <- do.call(rbind,(lapply(QC$geometry %>%
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(incidental_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
+row.names(QC_incidental_dist) <- QC$Lease_Identifier
+colnames(QC_incidental_dist) <- incidental_sites$StnLocation
+saveRDS(QC_incidental_dist,"outputdata/QC_incidental_dist.rds")
+
+
+###Calculate monitoring site distances for each prov####
+# searchbox <- monitoring_sites %>%
+#   st_transform(equidist) %>%
+#   st_bbox() %>%
+#   st_as_sfc() %>%          # convert bbox to polygon
+#   st_buffer(10000)
+# 
+# r <- raster(
+#   as(searchbox, "Spatial"),
+#   res = 1000
+# )
+# 
+# r <- fasterize(maritimes, r)
+# r@data@values[r@data@values==1] <- 1
+# r@data@values[is.na(r@data@values)] <- 10000
+# plot(r)
+# tr <- transition(r, mean, directions = 16, symm=TRUE)
+# saveRDS(tr,"outputdata/transition.rds")
+
+
+ns_monitoring_dist <- do.call(rbind,(lapply(NS$geometry %>%
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(monitoring_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
+row.names(ns_monitoring_dist) <- NS$Lease_Identifier
+colnames(ns_monitoring_dist) <- monitoring_sites$StnLocation
+saveRDS(ns_monitoring_dist,"outputdata/ns_monitoring_dist.rds")
+
+nb_monitoring_dist <- do.call(rbind,(lapply(NB$geometry %>%
+                                              st_transform(equidist),
+                                            function(x) inwaterdistance(monitoring_sites %>%
+                                                                          st_transform(equidist),
+                                                                        x,
+                                                                        tr))))
+row.names(nb_monitoring_dist) <- NB$Lease_Identifier
+colnames(nb_monitoring_dist) <- monitoring_sites$StnLocation
+saveRDS(nb_monitoring_dist,"outputdata/nb_monitoring_dist.rds")
+
 pei_monitoring_dist <- do.call(rbind,(lapply(PEI$geometry %>%
                                                st_transform(equidist),
                                              function(x) inwaterdistance(monitoring_sites %>%
@@ -971,19 +1001,6 @@ pei_monitoring_dist <- do.call(rbind,(lapply(PEI$geometry %>%
 row.names(pei_monitoring_dist) <- PEI$Lease_Identifier
 colnames(pei_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(pei_monitoring_dist,"outputdata/pei_monitoring_dist.rds")
-
-#### NL vs  incidentals and monitoring ####
-
-print("Calculating in water distances for NL")
-NL_incidental_dist <- do.call(rbind,(lapply(NL$geometry %>%
-                                               st_transform(equidist),
-                                             function(x) inwaterdistance(incidental_sites %>%
-                                                                           st_transform(equidist),
-                                                                         x,
-                                                                         tr))))
-row.names(NL_incidental_dist) <- NL$Lease_Identifier
-colnames(NL_incidental_dist) <- incidental_sites$StnLocation
-saveRDS(NL_incidental_dist,"outputdata/NL_incidental_dist.rds")
 
 NL_monitoring_dist <- do.call(rbind,(lapply(NL$geometry %>%
                                                st_transform(equidist),
@@ -996,17 +1013,6 @@ NL_monitoring_dist <- do.call(rbind,(lapply(NL$geometry %>%
 row.names(NL_monitoring_dist) <- NL$Lease_Identifier
 colnames(NL_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(NL_monitoring_dist,"outputdata/NL_monitoring_dist.rds")
-
-#### QC vs  incidental and monitoring ####
-QC_incidental_dist <- do.call(rbind,(lapply(QC$geometry %>%
-                                              st_transform(equidist),
-                                            function(x) inwaterdistance(incidental_sites %>%
-                                                                          st_transform(equidist),
-                                                                        x,
-                                                                        tr))))
-row.names(QC_incidental_dist) <- QC$Lease_Identifier
-colnames(QC_incidental_dist) <- incidental_sites$StnLocation
-saveRDS(QC_incidental_dist,"outputdata/QC_incidental_dist.rds")
 
 QC_monitoring_dist <- do.call(rbind,(lapply(QC$geometry %>%
                                               st_transform(equidist),
