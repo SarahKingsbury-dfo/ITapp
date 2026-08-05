@@ -66,7 +66,8 @@ proj <- "+proj=longlat +datum=WGS84"
 NS <- readRDS("spatialdata/NS.rds")
 NB <- readRDS("spatialdata/NB.rds")
 PEI <- readRDS("spatialdata/PEI.rds")
-NL<- readRDS("spatialdata/NL.rds")
+NL<- readRDS("spatialdata/NL.rds")%>%
+  mutate(Lease_Identifier=Lease_Indentifier)
 QC<- readRDS("spatialdata/QC.rds")
 
 
@@ -507,6 +508,8 @@ server <- function(input, output, session) {
   
   # reactive switches that get the correct leases and distance matrices
   origprovInput <- reactive({
+    #browser()
+    
     switch(input$origprov,
            "NS" = NS,
            "NB" = NB,
@@ -565,7 +568,7 @@ server <- function(input, output, session) {
   
   # full interactive map
   output$leafletmap <- renderLeaflet({
-   # browser()
+   #browser()
     
     all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
                         dplyr::select(NB,Lease_Identifier),

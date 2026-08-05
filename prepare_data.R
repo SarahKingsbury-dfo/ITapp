@@ -17,8 +17,20 @@ print("Warning: Initial installation will take multiple hours!")
 
 print("Loading data")
 proj <- "+proj=longlat +datum=WGS84"
-#equidist <- "+proj=eqdc +lon_0=-58.50 +lat_0=48.00 +lat_1=44.00 +lat_2=52.00 +x_0=1000000 +y_0=1000000 +datum=WGS84 +units=m +no_defs"
-equidist<-equidist <- "+proj=eqdc +lon_0=-66.00 +lat_0=53.00 +lat_1=47.00 +lat_2=59.00 +x_0=2000000 +y_0=2000000 +datum=WGS84 +units=m +no_defs"
+# equidist1 <- "+proj=eqdc +lon_0=-58.50 +lat_0=48.00 +lat_1=44.00 +lat_2=52.00 +x_0=1000000 +y_0=1000000 +datum=WGS84 +units=m +no_defs"
+# equidist2<- "+proj=eqdc +lon_0=-66.00 +lat_0=53.00 +lat_1=47.00 +lat_2=59.00 +x_0=2000000 +y_0=2000000 +datum=WGS84 +units=m +no_defs"
+equidist <- paste(
+  "+proj=eqdc",
+  "+lat_1=45",
+  "+lat_2=58",
+  "+lat_0=51.5",
+  "+lon_0=-66",
+  "+x_0=2000000",
+  "+y_0=2000000",
+  "+datum=WGS84",
+  "+units=m",
+  "+no_defs"
+)
 sf_use_s2(FALSE)
 
 # NS<-st_read("spatialdata/NS_Aqua_lease_2026/geo_export_95bfaf74-c1b7-4c65-a258-d1cb7076637e.shp")%>%
@@ -835,15 +847,29 @@ library(fasterize)
 library(sp)
 
 print("Setting up transition matrix")
-# searchbox<-extent(st_bbox(searcharea %>% st_transform(equidist)))
-r <- raster(maritimes,
-            # xmn=628730, #issue with extent and x and y values for min/max. 
-            # xmx=1374056 , #Maritimes polygon is cropped to the box extent above, therefore, no need to repeat the operation here.
-            # ymn=603784.7,
-            # ymx=1311254,
-            #ext=searchbox,
-            #ext=extent(st_bbox(searcharea %>% st_transform(equidist))),
-            res = 1000)
+#searchbox<-extent(st_bbox(monitoring_sites %>% st_transform(equidist)))
+
+# r <- raster(
+#   #maritimes,
+#             # xmn=628730, #issue with extent and x and y values for min/max. 
+#             # xmx=1374056 , #Maritimes polygon is cropped to the box extent above, therefore, no need to repeat the operation here.
+#             # ymn=603784.7,
+#             # ymx=1311254,
+#             ext=searchbox,
+#             #ext=extent(st_bbox(searcharea %>% st_transform(equidist))),
+#             res = 1000)
+
+searchbox <- monitoring_sites %>%
+  st_transform(equidist) %>%
+  st_bbox() %>%
+  st_as_sfc() %>%          # convert bbox to polygon
+  st_buffer(10000)
+
+r <- raster(
+  as(searchbox, "Spatial"),
+  res = 1000
+)
+
 r <- fasterize(maritimes, r)
 r@data@values[r@data@values==1] <- 1
 r@data@values[is.na(r@data@values)] <- 10000
