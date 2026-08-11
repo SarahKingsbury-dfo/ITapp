@@ -19,14 +19,17 @@ nearestsites <- function(lease,prov,sites,n,distmat){
     stop("Invalid lease identifier (prov error)")
   }
   if(!lease$Lease_Identifier %in% row.names(distmat)){
-    browser()
+    #browser()
     stop("Invalid lease identifier (distmat error)")
   }
-  
+  #browser()
   # print("calculating nearest sites")
-  distances <- data.table(StnLocation=colnames(distmat),
-                          distance=distmat[row.names(distmat)==as.character(lease$Lease_Identifier),]) 
-  
+  # distances <- data.table(StnLocation=colnames(distmat),
+  #                         distance=distmat[row.names(distmat)==as.character(lease$Lease_Identifier),]) 
+  distances <- data.table(
+    StnLocation = as.character(colnames(distmat)), 
+    distance = as.numeric(distmat[match(as.character(lease$Lease_Identifier), row.names(distmat)), ])
+  )
   # if(ncol(distances)!=2){
   #   browser()
   # }
@@ -107,7 +110,9 @@ basemap <- function(leases, incidentals, monitoring, monitoringsp,...){
 
 #### basemap eDNA ####
 basemap_eDNA <- function(leases, eDNA, eDNAsp,...){
-  #browser()
+ 
+  # browser()
+  
   sp_eDNA <- eDNAsp[eDNAsp %in% names(eDNA)]
   
   palette_for_minicharts_eDNA <- species_palette[sp_eDNA]

@@ -288,30 +288,64 @@ server <- function(input, output, session) {
   })
   
   #filtering eDNA data data
+  # eDNA_filtered <- reactive({
+  #   browser()
+  #   eDNA %>% 
+  #     #filter(Year>=input$eDNAyear) %>% 
+  #     as.data.table() %>% 
+  #     dplyr::select(-geometry) %>%
+  #     gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
+  #     group_by(Species,StnLocation) %>% 
+  #     summarize(
+  #       History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
+  #                         any(!Presence)~paste0("Detected in: ",
+  #                                               paste(Year[Presence],collapse = ", "),
+  #                                               ", and not detected in: ",
+  #                                               paste(Year[!Presence],collapse = ", ")),
+  #                         TRUE~paste("Detected in",paste(Year,collapse = ","))),
+  #       Presence = if_else(all(is.na(Presence)),
+  #                          FALSE,
+  #                          any(Presence>0,na.rm = TRUE))
+  #     ) %>% 
+  #     ungroup() %>% 
+  #     mutate(Presence=as.character(Presence)) %>%
+  #     tidyr::pivot_longer(cols = c(Presence,History)) %>%
+  #     tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
+  #     inner_join(eDNA_sites,by = "StnLocation")
+  # })
   eDNA_filtered <- reactive({
     #browser()
     eDNA %>% 
       filter(Year>=input$eDNAyear) %>% 
       as.data.table() %>% 
-      dplyr::select(-geometry) %>%
-      gather(key = "Species", value = "Presence",-StnLocation,-Year) %>%
-      group_by(Species,StnLocation) %>% 
+      dplyr::select(-geometry) %>% 
+      gather(key = "Species", value = "Presence_Val", -StnLocation, -Year) %>% 
+      
+      # 1. Flag each individual row FIRST using mutate
+      mutate(
+        Is_Present = if_else(is.na(Presence_Val), FALSE, Presence_Val > 0)
+      ) %>%
+      
+      # 2. Now group and summarize down to 1 row per group
+      group_by(Species, StnLocation) %>% 
       summarize(
-        History=case_when(!any(Presence)~paste("Not detected in:",paste(Year,collapse = ", ")),
-                          any(!Presence)~paste0("Detected in: ",
-                                                paste(Year[Presence],collapse = ", "),
-                                                ", and not detected in: ",
-                                                paste(Year[!Presence],collapse = ", ")),
-                          TRUE~paste("Detected in",paste(Year,collapse = ","))),
-        Presence = if_else(all(is.na(Presence)),
-                           FALSE,
-                           any(Presence>0,na.rm = TRUE))
+        History = case_when(
+          !any(Is_Present)  ~ paste("Not detected in:", paste(Year, collapse = ", ")),
+          any(!Is_Present) ~ paste0("Detected in: ", 
+                                    paste(Year[Is_Present], collapse = ", "), 
+                                    ", and not detected in: ", 
+                                    paste(Year[!Is_Present], collapse = ", ")),
+          TRUE             ~ paste("Detected in", paste(Year, collapse = ","))
+        ),
+        
+        # Use your original raw column (Presence_Val) to check for all NAs
+        Presence = if_else(all(is.na(Presence_Val)), FALSE, any(Presence_Val > 0, na.rm = TRUE)),
+        .groups = "drop" 
       ) %>% 
-      ungroup() %>% 
-      mutate(Presence=as.character(Presence)) %>%
-      tidyr::pivot_longer(cols = c(Presence,History)) %>%
-      tidyr::pivot_wider(id_cols = c(StnLocation,name), names_from = Species, values_from = value) %>%
-      inner_join(eDNA_sites,by = "StnLocation")
+      mutate(Presence = as.character(Presence)) %>% 
+      tidyr::pivot_longer(cols = c(Presence, History)) %>% 
+      tidyr::pivot_wider(id_cols = c(StnLocation, name), names_from = Species, values_from = value) %>% 
+      inner_join(eDNA_sites, by = "StnLocation")
   })
   
 #filtering incidental reports by by DFO or made to DFO's email inboxs that had photo evidence
@@ -338,17 +372,33 @@ server <- function(input, output, session) {
   })
   
 #Public report map filtering
+  # publicdata_filtered <- reactive({
+  #    browser()
+  #   publicdata %>% 
+  #     #filter(Year>=input$publicyear) %>% 
+  #     as.data.table() %>% 
+  #     dplyr::select(-geometry) %>% 
+  #     group_by(Species,StnLocation) %>% 
+  #     summarize(Presence = TRUE,
+  #               prov = paste(unique(prov))) %>% 
+  #     ungroup() %>% 
+  #     left_join(publicdata_sites,by = "StnLocation")
+  # })
+  
   publicdata_filtered <- reactive({
-     #browser()
+    #browser()
     publicdata %>% 
       filter(Year>=input$publicyear) %>% 
       as.data.table() %>% 
       dplyr::select(-geometry) %>% 
-      group_by(Species,StnLocation) %>% 
-      summarize(Presence = TRUE,
-                prov = paste(unique(prov))) %>% 
-      ungroup() %>% 
-      left_join(publicdata_sites,by = "StnLocation")
+      group_by(Species, StnLocation) %>% 
+      summarize(
+        Presence = TRUE, 
+        # Adding collapse = ", " glues multiple strings into exactly 1 string
+        prov = paste(unique(prov), collapse = ", "),
+        .groups = "drop" # Safely ungroups automatically
+      ) %>% 
+      left_join(publicdata_sites, by = "StnLocation")
   })
   
   # functions for updating UI
@@ -567,13 +617,14 @@ server <- function(input, output, session) {
   
   # full interactive map
   output$leafletmap <- renderLeaflet({
-   #browser()
+  # browser()
     
     all_leases <- rbind(dplyr::select(NS,Lease_Identifier),
                         dplyr::select(NB,Lease_Identifier),
                         dplyr::select(PEI,Lease_Identifier),
                         dplyr::select(NL,Lease_Identifier),
                         dplyr::select(QC,Lease_Identifier))
+    
     basemap(leases=all_leases,
             incidentals=incidental_filtered(),
             monitoring=monitoring_filtered() %>% filter(name=="Presence") %>% 
@@ -615,7 +666,7 @@ server <- function(input, output, session) {
 
   # map for origin tab
   output$leafletorig <- renderLeaflet({
-     #browser()
+    # browser()
     print("making map")
     
     prov <- origprovInput()
