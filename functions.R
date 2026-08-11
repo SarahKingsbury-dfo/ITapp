@@ -19,7 +19,7 @@ nearestsites <- function(lease,prov,sites,n,distmat){
     stop("Invalid lease identifier (prov error)")
   }
   if(!lease$Lease_Identifier %in% row.names(distmat)){
-    #browser()
+    browser()
     stop("Invalid lease identifier (distmat error)")
   }
   

@@ -66,8 +66,7 @@ proj <- "+proj=longlat +datum=WGS84"
 NS <- readRDS("spatialdata/NS.rds")
 NB <- readRDS("spatialdata/NB.rds")
 PEI <- readRDS("spatialdata/PEI.rds")
-NL<- readRDS("spatialdata/NL.rds")%>%
-  mutate(Lease_Identifier=Lease_Indentifier)
+NL<- readRDS("spatialdata/NL.rds")
 QC<- readRDS("spatialdata/QC.rds")
 
 

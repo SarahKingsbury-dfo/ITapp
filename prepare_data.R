@@ -916,8 +916,7 @@ row.names(nb_incidental_dist) <- NB$Lease_Identifier
 colnames(nb_incidental_dist) <- incidental_sites$StnLocation
 saveRDS(nb_incidental_dist,"outputdata/nb_incidental_dist.rds")
 
-PEI <- sf::st_make_valid(PEI)
-PEI <- PEI[sf::st_geometry_type(PEI) == "POLYGON", ]
+
 
 print("Calculating in water distances for PEI")
 pei_incidental_dist <- do.call(rbind,(lapply(PEI$geometry %>%
@@ -970,7 +969,7 @@ saveRDS(QC_incidental_dist,"outputdata/QC_incidental_dist.rds")
 # plot(r)
 # tr <- transition(r, mean, directions = 16, symm=TRUE)
 # saveRDS(tr,"outputdata/transition.rds")
-
+leaflet::leaflet(monitoring_sites) %>% leaflet::addTiles() %>% leaflet::addMarkers()
 
 ns_monitoring_dist <- do.call(rbind,(lapply(NS$geometry %>%
                                               st_transform(equidist),
@@ -991,6 +990,11 @@ nb_monitoring_dist <- do.call(rbind,(lapply(NB$geometry %>%
 row.names(nb_monitoring_dist) <- NB$Lease_Identifier
 colnames(nb_monitoring_dist) <- monitoring_sites$StnLocation
 saveRDS(nb_monitoring_dist,"outputdata/nb_monitoring_dist.rds")
+
+# PEI <- sf::st_make_valid(PEI)
+# PEI <- PEI %>% 
+#   filter(st_is(geometry, c("POLYGON"))) #remove single linestring lease from dataset
+# saveRDS(PEI, "spatialdata/PEI.rds")
 
 pei_monitoring_dist <- do.call(rbind,(lapply(PEI$geometry %>%
                                                st_transform(equidist),
